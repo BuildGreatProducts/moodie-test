@@ -7,45 +7,43 @@ interface HeaderProps {
   onMenuClick?: () => void;
 }
 
+function LoadingAvatar() {
+  return (
+    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200">
+      <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
+    </div>
+  );
+}
+
+function FallbackAvatar() {
+  return (
+    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200">
+      <User className="h-4 w-4 text-neutral-500" />
+    </div>
+  );
+}
+
 function UserAvatar() {
-  // This will only be rendered when ClerkProvider is available
-  try {
-    const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
 
-    if (!isLoaded) {
-      return (
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200">
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-400 border-t-transparent" />
-        </div>
-      );
-    }
+  if (!isLoaded) {
+    return <LoadingAvatar />;
+  }
 
-    if (isSignedIn) {
-      return (
-        <UserButton
-          afterSignOutUrl="/"
-          appearance={{
-            elements: {
-              avatarBox: "w-8 h-8",
-            },
-          }}
-        />
-      );
-    }
-
+  if (isSignedIn) {
     return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200">
-        <User className="h-4 w-4 text-neutral-500" />
-      </div>
-    );
-  } catch {
-    // If Clerk is not available, show a fallback
-    return (
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200">
-        <User className="h-4 w-4 text-neutral-500" />
-      </div>
+      <UserButton
+        afterSignOutUrl="/"
+        appearance={{
+          elements: {
+            avatarBox: "w-8 h-8",
+          },
+        }}
+      />
     );
   }
+
+  return <FallbackAvatar />;
 }
 
 export function Header({ onMenuClick }: HeaderProps) {

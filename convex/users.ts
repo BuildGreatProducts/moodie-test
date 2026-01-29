@@ -1,10 +1,21 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
-// Get user by Clerk ID
+// Get user by Clerk ID (authenticated, can only fetch own record)
 export const getByClerkId = query({
   args: { clerkId: v.string() },
   handler: async (ctx, args) => {
+    // Verify authentication
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    // Users can only fetch their own record
+    if (identity.subject !== args.clerkId) {
+      throw new Error("Not authorized to access this user record");
+    }
+
     return await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))

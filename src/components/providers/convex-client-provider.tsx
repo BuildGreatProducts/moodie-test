@@ -7,8 +7,8 @@ import { ClerkProvider, useAuth } from "@clerk/nextjs";
 
 function isValidClerkKey(key: string | undefined): boolean {
   if (!key) return false;
-  // Clerk publishable keys start with pk_live_ or pk_test_ followed by valid characters
-  return /^pk_(live|test)_[a-zA-Z0-9]+$/.test(key) && !key.includes("placeholder");
+  // Clerk publishable keys start with pk_live_ or pk_test_ followed by base64 characters
+  return /^pk_(live|test)_[a-zA-Z0-9+/=]+$/.test(key) && !key.includes("placeholder");
 }
 
 function isValidConvexUrl(url: string | undefined): boolean {

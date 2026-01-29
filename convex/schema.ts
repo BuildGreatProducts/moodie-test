@@ -43,7 +43,7 @@ export default defineSchema({
     thumbnailUrl: v.optional(v.string()),
     shareId: v.optional(v.string()),
     shareEnabled: v.optional(v.boolean()),
-    sharePassword: v.optional(v.string()),
+    sharePasswordHash: v.optional(v.string()), // bcrypt/argon2 hashed password
     shareExpiresAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),

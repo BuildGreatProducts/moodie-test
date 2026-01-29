@@ -1,5 +1,45 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+
+// Helper: Get authenticated user or throw
+async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new Error("Not authenticated");
+  }
+
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+    .first();
+
+  if (!user) {
+    throw new Error("User not found");
+  }
+
+  return user;
+}
+
+// Helper: Authorize project access - verifies ownership
+async function authorizeProjectAccess(
+  ctx: QueryCtx | MutationCtx,
+  projectId: Id<"projects">
+) {
+  const user = await getAuthenticatedUser(ctx);
+
+  const project = await ctx.db.get(projectId);
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  // Verify the user owns this project
+  if (project.userId !== user._id) {
+    throw new Error("Not authorized to access this project");
+  }
+
+  return { user, project };
+}
 
 // Get all projects for the current user
 export const list = query({
@@ -21,10 +61,8 @@ export const list = query({
       return [];
     }
 
-    let projects;
-
     // Get all projects for user and filter in memory
-    projects = await ctx.db
+    let projects = await ctx.db
       .query("projects")
       .withIndex("by_user_id", (q) => q.eq("userId", user._id))
       .order("desc")
@@ -58,15 +96,8 @@ export const list = query({
 export const get = query({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const project = await ctx.db.get(args.id);
-    if (!project) {
-      return null;
-    }
+    // Use helper to verify authentication and ownership
+    const { project } = await authorizeProjectAccess(ctx, args.id);
 
     // Get moodboards for this project
     const moodboards = await ctx.db
@@ -91,19 +122,7 @@ export const create = mutation({
     clientEmail: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!user) {
-      throw new Error("User not found");
-    }
+    const user = await getAuthenticatedUser(ctx);
 
     const now = Date.now();
 
@@ -145,15 +164,8 @@ export const update = mutation({
     status: v.optional(v.union(v.literal("active"), v.literal("archived"))),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const project = await ctx.db.get(args.id);
-    if (!project) {
-      throw new Error("Project not found");
-    }
+    // Verify authentication and ownership
+    await authorizeProjectAccess(ctx, args.id);
 
     const { id, ...updates } = args;
     const filteredUpdates = Object.fromEntries(
@@ -174,15 +186,8 @@ export const update = mutation({
 export const remove = mutation({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const project = await ctx.db.get(args.id);
-    if (!project) {
-      throw new Error("Project not found");
-    }
+    // Verify authentication and ownership
+    await authorizeProjectAccess(ctx, args.id);
 
     // Delete all moodboards for this project
     const moodboards = await ctx.db
@@ -229,15 +234,8 @@ export const remove = mutation({
 export const toggleArchive = mutation({
   args: { id: v.id("projects") },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Not authenticated");
-    }
-
-    const project = await ctx.db.get(args.id);
-    if (!project) {
-      throw new Error("Project not found");
-    }
+    // Verify authentication and ownership
+    const { project } = await authorizeProjectAccess(ctx, args.id);
 
     const newStatus = project.status === "active" ? "archived" : "active";
 
