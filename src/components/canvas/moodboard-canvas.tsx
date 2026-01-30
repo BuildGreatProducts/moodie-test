@@ -27,6 +27,7 @@ import { TextNode } from "./text-node";
 import { ColorNode } from "./color-node";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { useCanvasHistory } from "@/hooks/use-canvas-history";
+import { ProductLibraryPanel, ProductCardData } from "@/components/products";
 
 // Custom node types
 const nodeTypes: NodeTypes = {
@@ -260,72 +261,94 @@ export function MoodboardCanvas({
     [reactFlowInstance, setNodes, pushState]
   );
 
-  return (
-    <div ref={reactFlowWrapper} className="h-full w-full">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={handleNodesChange}
-        onEdgesChange={handleEdgesChange}
-        onConnect={onConnect}
-        onInit={setReactFlowInstance}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onSelectionChange={onSelectionChange}
-        nodeTypes={nodeTypes}
-        edgeTypes={edgeTypes}
-        connectionMode={ConnectionMode.Loose}
-        selectionMode={SelectionMode.Partial}
-        snapToGrid={snapToGrid}
-        snapGrid={[15, 15]}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.1}
-        maxZoom={4}
-        deleteKeyCode={null}
-        multiSelectionKeyCode={["Shift", "Meta", "Control"]}
-        className="bg-neutral-50"
-      >
-        <Background color="#E5E7EB" gap={20} size={1} />
-        <Controls
-          showInteractive={false}
-          className="!rounded-lg !border-neutral-200 !bg-white !shadow-soft-md"
-        />
-        <MiniMap
-          nodeColor={(node) => {
-            switch (node.type) {
-              case "image":
-                return "#818CF8";
-              case "product":
-                return "#34D399";
-              case "text":
-                return "#FBBF24";
-              case "color":
-                return (node.data as { color?: string })?.color || "#94A3B8";
-              default:
-                return "#94A3B8";
-            }
-          }}
-          maskColor="rgba(255, 255, 255, 0.8)"
-          className="!rounded-lg !border-neutral-200 !bg-white !shadow-soft-md"
-        />
+  // Add product from library panel (double-click)
+  const handleAddProductToCanvas = useCallback(
+    (product: ProductCardData) => {
+      addNode("product", {
+        imageUrl: product.imageUrl,
+        name: product.name,
+        price: product.price,
+        currency: product.currency,
+        sourceUrl: product.sourceUrl,
+      });
+    },
+    [addNode]
+  );
 
-        {/* Canvas Toolbar */}
-        <Panel position="top-center">
-          <CanvasToolbar
-            onAddNode={addNode}
-            onUndo={undo}
-            onRedo={redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            snapToGrid={snapToGrid}
-            onToggleSnap={() => setSnapToGrid(!snapToGrid)}
-            selectedNodes={selectedNodes}
-            nodes={nodes}
-            setNodes={setNodes}
+  return (
+    <div className="flex h-full w-full">
+      {/* Canvas Area */}
+      <div ref={reactFlowWrapper} className="relative flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
+          onConnect={onConnect}
+          onInit={setReactFlowInstance}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          onSelectionChange={onSelectionChange}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          connectionMode={ConnectionMode.Loose}
+          selectionMode={SelectionMode.Partial}
+          snapToGrid={snapToGrid}
+          snapGrid={[15, 15]}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          minZoom={0.1}
+          maxZoom={4}
+          deleteKeyCode={null}
+          multiSelectionKeyCode={["Shift", "Meta", "Control"]}
+          className="bg-neutral-50"
+        >
+          <Background color="#E5E7EB" gap={20} size={1} />
+          <Controls
+            showInteractive={false}
+            className="!rounded-lg !border-neutral-200 !bg-white !shadow-soft-md"
           />
-        </Panel>
-      </ReactFlow>
+          <MiniMap
+            nodeColor={(node) => {
+              switch (node.type) {
+                case "image":
+                  return "#818CF8";
+                case "product":
+                  return "#34D399";
+                case "text":
+                  return "#FBBF24";
+                case "color":
+                  return (node.data as { color?: string })?.color || "#94A3B8";
+                default:
+                  return "#94A3B8";
+              }
+            }}
+            maskColor="rgba(255, 255, 255, 0.8)"
+            className="!rounded-lg !border-neutral-200 !bg-white !shadow-soft-md"
+          />
+
+          {/* Canvas Toolbar */}
+          <Panel position="top-center">
+            <CanvasToolbar
+              onAddNode={addNode}
+              onUndo={undo}
+              onRedo={redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
+              snapToGrid={snapToGrid}
+              onToggleSnap={() => setSnapToGrid(!snapToGrid)}
+              selectedNodes={selectedNodes}
+              nodes={nodes}
+              setNodes={setNodes}
+            />
+          </Panel>
+        </ReactFlow>
+      </div>
+
+      {/* Product Library Panel */}
+      <div className="relative">
+        <ProductLibraryPanel onAddProductToCanvas={handleAddProductToCanvas} />
+      </div>
     </div>
   );
 }
