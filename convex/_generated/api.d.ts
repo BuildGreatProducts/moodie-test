@@ -11,10 +11,14 @@ import type {
 
 import type * as users from "../users.js";
 import type * as projects from "../projects.js";
+import type * as moodboards from "../moodboards.js";
+import type * as files from "../files.js";
 
 declare const fullApi: ApiFromModules<{
   users: typeof users;
   projects: typeof projects;
+  moodboards: typeof moodboards;
+  files: typeof files;
 }>;
 
 export declare const api: FilterApi<

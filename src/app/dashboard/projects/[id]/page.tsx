@@ -1,13 +1,17 @@
 "use client";
 
-import { use } from "react";
-import { useQuery } from "convex/react";
+import { use, useState } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { MoodboardModal } from "@/components/dashboard/moodboard-modal";
 import { formatRelativeTime } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { ArrowLeft, Layout, Plus, MoreHorizontal } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Layout, Plus, MoreHorizontal, Trash2, Pencil } from "lucide-react";
 import { Id } from "../../../../../convex/_generated/dataModel";
 
 interface Moodboard {
@@ -38,10 +42,74 @@ interface PageProps {
 
 export default function ProjectDetailPage({ params }: PageProps) {
   const { id } = use(params);
+  const router = useRouter();
+  const { toast } = useToast();
   const project = useQuery(api.projects.get, { id: id as Id<"projects"> }) as
     | ProjectWithMoodboards
     | null
     | undefined;
+
+  const createMoodboard = useMutation(api.moodboards.create);
+  const deleteMoodboard = useMutation(api.moodboards.remove);
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [selectedMoodboard, setSelectedMoodboard] = useState<Moodboard | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  const handleCreateMoodboard = async (data: {
+    name: string;
+    description?: string;
+    startingPoint: "blank" | "upload" | "generate";
+  }) => {
+    setIsLoading(true);
+    try {
+      const moodboardId = await createMoodboard({
+        projectId: id as Id<"projects">,
+        name: data.name,
+        description: data.description,
+      });
+      setIsCreateModalOpen(false);
+      toast({
+        title: "Moodboard created",
+        description: `"${data.name}" has been created successfully.`,
+      });
+      // Navigate to the canvas editor
+      router.push(`/dashboard/moodboard/${moodboardId}`);
+    } catch (error) {
+      toast({
+        type: "error",
+        title: "Error",
+        description: "Failed to create moodboard. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteMoodboard = async () => {
+    if (!selectedMoodboard) return;
+    setIsLoading(true);
+    try {
+      await deleteMoodboard({ id: selectedMoodboard._id });
+      setIsDeleteModalOpen(false);
+      setSelectedMoodboard(null);
+      toast({
+        type: "success",
+        title: "Moodboard deleted",
+        description: `"${selectedMoodboard.name}" has been deleted.`,
+      });
+    } catch (error) {
+      toast({
+        type: "error",
+        title: "Error",
+        description: "Failed to delete moodboard. Please try again.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (project === undefined) {
     return (
@@ -101,7 +169,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
             {project.description && <p className="mt-2 text-neutral-600">{project.description}</p>}
           </div>
 
-          <button className="btn-primary gap-2">
+          <button onClick={() => setIsCreateModalOpen(true)} className="btn-primary gap-2">
             <Plus className="h-5 w-5" />
             New Moodboard
           </button>
@@ -115,7 +183,7 @@ export default function ProjectDetailPage({ params }: PageProps) {
           title="No moodboards yet"
           description="Create your first moodboard to start designing."
           action={
-            <button className="btn-primary gap-2">
+            <button onClick={() => setIsCreateModalOpen(true)} className="btn-primary gap-2">
               <Plus className="h-5 w-5" />
               Create Moodboard
             </button>
@@ -125,6 +193,13 @@ export default function ProjectDetailPage({ params }: PageProps) {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {project.moodboards.map((moodboard) => (
             <div key={moodboard._id} className="card group relative transition-shadow hover:shadow-soft-md">
+              {/* Clickable area for navigation */}
+              <Link
+                href={`/dashboard/moodboard/${moodboard._id}`}
+                className="absolute inset-0 z-0"
+                aria-label={`Open ${moodboard.name}`}
+              />
+
               {/* Thumbnail */}
               <div className="mb-3 aspect-video overflow-hidden rounded-lg bg-neutral-100">
                 {moodboard.thumbnailUrl ? (
@@ -149,17 +224,48 @@ export default function ProjectDetailPage({ params }: PageProps) {
                   </p>
                 </div>
 
-                <button
-                  className="rounded-md p-1 opacity-0 transition-opacity hover:bg-neutral-100 group-hover:opacity-100"
-                  aria-label="Moodboard options"
-                >
-                  <MoreHorizontal className="h-5 w-5 text-neutral-400" />
-                </button>
+                {/* Context menu */}
+                <div className="relative z-10">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(openMenuId === moodboard._id ? null : moodboard._id);
+                    }}
+                    className="rounded-md p-1 opacity-0 transition-opacity hover:bg-neutral-100 group-hover:opacity-100"
+                    aria-label="Moodboard options"
+                  >
+                    <MoreHorizontal className="h-5 w-5 text-neutral-400" />
+                  </button>
+
+                  {openMenuId === moodboard._id && (
+                    <div className="absolute right-0 top-8 z-20 w-40 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+                      <Link
+                        href={`/dashboard/moodboard/${moodboard._id}`}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                        onClick={() => setOpenMenuId(null)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                        Edit
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setSelectedMoodboard(moodboard);
+                          setIsDeleteModalOpen(true);
+                          setOpenMenuId(null);
+                        }}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Share indicator */}
               {moodboard.shareEnabled && (
-                <span className="absolute right-3 top-3 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                <span className="absolute right-3 top-3 z-10 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
                   Shared
                 </span>
               )}
@@ -167,6 +273,29 @@ export default function ProjectDetailPage({ params }: PageProps) {
           ))}
         </div>
       )}
+
+      {/* Create Moodboard Modal */}
+      <MoodboardModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateMoodboard}
+        isLoading={isLoading}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setSelectedMoodboard(null);
+        }}
+        onConfirm={handleDeleteMoodboard}
+        title="Delete Moodboard"
+        message={`Are you sure you want to delete "${selectedMoodboard?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        isLoading={isLoading}
+        variant="danger"
+      />
     </div>
   );
 }
