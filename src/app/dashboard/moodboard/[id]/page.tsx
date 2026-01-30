@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useCallback, useEffect } from "react";
+import { use, useState, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../../convex/_generated/api";
 import { Id } from "../../../../../convex/_generated/dataModel";
@@ -35,14 +35,28 @@ export default function MoodboardEditorPage({ params }: PageProps) {
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
   const [initialState, setInitialState] = useState<CanvasState | null>(null);
+  const lastMoodboardIdRef = useRef<string | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Parse initial canvas state
+  // Parse initial canvas state - runs when moodboard changes
   useEffect(() => {
-    if (moodboard?.canvasState && !initialState) {
-      try {
-        const parsed = JSON.parse(moodboard.canvasState);
-        setInitialState(parsed);
-      } catch {
+    // Only update if we have a new moodboard ID
+    const moodboardId = moodboard?._id;
+    if (moodboardId && moodboardId !== lastMoodboardIdRef.current) {
+      lastMoodboardIdRef.current = moodboardId;
+
+      if (moodboard.canvasState) {
+        try {
+          const parsed = JSON.parse(moodboard.canvasState);
+          setInitialState(parsed);
+        } catch {
+          setInitialState({
+            nodes: [],
+            edges: [],
+            viewport: { x: 0, y: 0, zoom: 1 },
+          });
+        }
+      } else {
         setInitialState({
           nodes: [],
           edges: [],
@@ -50,23 +64,44 @@ export default function MoodboardEditorPage({ params }: PageProps) {
         });
       }
     }
-  }, [moodboard, initialState]);
+  }, [moodboard?._id, moodboard?.canvasState]);
 
-  // Handle canvas state changes (auto-save)
+  // Handle canvas state changes (auto-save with page-level status management)
   const handleStateChange = useCallback(
-    async (state: CanvasState) => {
-      try {
-        await updateCanvasState({
-          id: id as Id<"moodboards">,
-          canvasState: JSON.stringify(state),
-        });
-      } catch (error) {
-        console.error("Failed to save canvas state:", error);
-        setSaveStatus("error");
+    (state: CanvasState) => {
+      // Clear any existing save timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
       }
+
+      // Show saving status
+      setSaveStatus("saving");
+
+      // Debounce the actual save
+      saveTimeoutRef.current = setTimeout(async () => {
+        try {
+          await updateCanvasState({
+            id: id as Id<"moodboards">,
+            canvasState: JSON.stringify(state),
+          });
+          setSaveStatus("saved");
+        } catch (error) {
+          console.error("Failed to save canvas state:", error);
+          setSaveStatus("error");
+        }
+      }, 300);
     },
     [id, updateCanvasState]
   );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Loading state
   if (moodboard === undefined) {
@@ -164,12 +199,11 @@ export default function MoodboardEditorPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Canvas */}
+      {/* Canvas - no longer needs onSaveStatus since page manages it */}
       <div className="flex-1">
         <MoodboardCanvas
           initialState={initialState}
           onStateChange={handleStateChange}
-          onSaveStatus={setSaveStatus}
         />
       </div>
     </div>

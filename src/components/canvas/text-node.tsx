@@ -21,6 +21,13 @@ function TextNodeComponent({ id, data, selected }: NodeProps) {
 
   const backgroundColor = nodeData.backgroundColor || "#FEF3C7"; // Default warm yellow
 
+  // Sync local text state with external updates (e.g., undo/redo)
+  useEffect(() => {
+    if (!isEditing) {
+      setText(nodeData.text || "");
+    }
+  }, [nodeData.text, isEditing]);
+
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();

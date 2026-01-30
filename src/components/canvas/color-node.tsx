@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState, useRef, useEffect } from "react";
+import { memo, useState, useRef, useEffect, useCallback } from "react";
 import { NodeProps, Handle, Position, NodeResizer, useReactFlow } from "@xyflow/react";
 import { Palette, Copy, Check } from "lucide-react";
 
@@ -19,6 +19,13 @@ function ColorNodeComponent({ id, data, selected }: NodeProps) {
 
   const color = nodeData.color || "#94A3B8"; // Default neutral color
 
+  // Sync local name state with external updates (e.g., undo/redo)
+  useEffect(() => {
+    if (!isEditingName) {
+      setName(nodeData.name || "");
+    }
+  }, [nodeData.name, isEditingName]);
+
   useEffect(() => {
     if (isEditingName && inputRef.current) {
       inputRef.current.focus();
@@ -31,8 +38,8 @@ function ColorNodeComponent({ id, data, selected }: NodeProps) {
     setIsEditingName(true);
   };
 
-  const handleBlur = () => {
-    setIsEditingName(false);
+  // Save name to node data
+  const saveName = useCallback(() => {
     setNodes((nodes) =>
       nodes.map((node) => {
         if (node.id === id) {
@@ -44,14 +51,21 @@ function ColorNodeComponent({ id, data, selected }: NodeProps) {
         return node;
       })
     );
+  }, [id, name, setNodes]);
+
+  const handleBlur = () => {
+    setIsEditingName(false);
+    saveName();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === "Escape") {
+    if (e.key === "Enter") {
+      e.preventDefault();
       setIsEditingName(false);
-      if (e.key === "Escape") {
-        setName(nodeData.name || "");
-      }
+      saveName();
+    } else if (e.key === "Escape") {
+      setIsEditingName(false);
+      setName(nodeData.name || "");
     }
   };
 

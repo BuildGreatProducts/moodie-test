@@ -70,6 +70,8 @@ export function useCanvasHistory({
         JSON.stringify(historyRef.current[currentIndexRef.current])
       ) {
         historyRef.current.push(currentState);
+        // Update index to point to newly pushed state so decrement goes to correct previous entry
+        currentIndexRef.current = historyRef.current.length - 1;
       }
     }
 

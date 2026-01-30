@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useEffect, useRef } from "react";
 import { NodeProps, Handle, Position, NodeResizer } from "@xyflow/react";
 import { ImageIcon, X } from "lucide-react";
 
@@ -9,11 +9,41 @@ export interface ImageNodeData {
   alt?: string;
   width?: number;
   height?: number;
+  isBlobUrl?: boolean;
 }
 
 function ImageNodeComponent({ data, selected }: NodeProps) {
   const nodeData = data as ImageNodeData;
   const [imageError, setImageError] = useState(false);
+  const [blobRevoked, setBlobRevoked] = useState(false);
+  const previousUrlRef = useRef<string | undefined>(undefined);
+
+  // Reset imageError when URL changes
+  useEffect(() => {
+    if (nodeData.url !== previousUrlRef.current) {
+      setImageError(false);
+      setBlobRevoked(false);
+      previousUrlRef.current = nodeData.url;
+    }
+  }, [nodeData.url]);
+
+  // Handle image load - revoke blob URL after successful load
+  const handleImageLoad = () => {
+    if (nodeData.isBlobUrl && nodeData.url && !blobRevoked) {
+      // Revoke the blob URL since the image is now loaded into memory
+      URL.revokeObjectURL(nodeData.url);
+      setBlobRevoked(true);
+    }
+  };
+
+  // Cleanup blob URL on unmount if not yet revoked
+  useEffect(() => {
+    return () => {
+      if (nodeData.isBlobUrl && nodeData.url && !blobRevoked) {
+        URL.revokeObjectURL(nodeData.url);
+      }
+    };
+  }, [nodeData.isBlobUrl, nodeData.url, blobRevoked]);
 
   return (
     <>
@@ -57,6 +87,7 @@ function ImageNodeComponent({ data, selected }: NodeProps) {
             src={nodeData.url}
             alt={nodeData.alt || "Moodboard image"}
             className="h-full w-full object-cover"
+            onLoad={handleImageLoad}
             onError={() => setImageError(true)}
             draggable={false}
           />

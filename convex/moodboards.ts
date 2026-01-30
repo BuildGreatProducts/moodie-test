@@ -1,64 +1,11 @@
 import { v } from "convex/values";
-import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-
-// Helper: Get authenticated user or throw
-async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("Not authenticated");
-  }
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-    .first();
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  return user;
-}
-
-// Helper: Authorize moodboard access - verifies ownership
-async function authorizeMoodboardAccess(
-  ctx: QueryCtx | MutationCtx,
-  moodboardId: Id<"moodboards">
-) {
-  const user = await getAuthenticatedUser(ctx);
-
-  const moodboard = await ctx.db.get(moodboardId);
-  if (!moodboard) {
-    throw new Error("Moodboard not found");
-  }
-
-  // Verify the user owns this moodboard
-  if (moodboard.userId !== user._id) {
-    throw new Error("Not authorized to access this moodboard");
-  }
-
-  return { user, moodboard };
-}
-
-// Helper: Authorize project access for creating moodboards
-async function authorizeProjectAccess(
-  ctx: QueryCtx | MutationCtx,
-  projectId: Id<"projects">
-) {
-  const user = await getAuthenticatedUser(ctx);
-
-  const project = await ctx.db.get(projectId);
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  if (project.userId !== user._id) {
-    throw new Error("Not authorized to access this project");
-  }
-
-  return { user, project };
-}
+import {
+  getAuthenticatedUser,
+  authorizeMoodboardAccess,
+  authorizeProjectAccess,
+} from "./auth-helpers";
 
 // List moodboards for a project
 export const listByProject = query({

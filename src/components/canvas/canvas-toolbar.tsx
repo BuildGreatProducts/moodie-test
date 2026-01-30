@@ -65,9 +65,9 @@ export function CanvasToolbar({
         return;
       }
 
-      // Create a local URL for the image
+      // Create a local URL for the image with blob flag for cleanup
       const url = URL.createObjectURL(file);
-      onAddNode("image", { url, alt: file.name });
+      onAddNode("image", { url, alt: file.name, isBlobUrl: true });
 
       // Reset input
       if (fileInputRef.current) {

@@ -12,10 +12,12 @@ function UserSync() {
   const upsertUser = useMutation(api.users.upsertUser);
 
   useEffect(() => {
-    if (user) {
+    // Only sync user if we have a valid email address
+    const email = user?.primaryEmailAddress?.emailAddress;
+    if (user && email) {
       upsertUser({
         clerkId: user.id,
-        email: user.primaryEmailAddress?.emailAddress ?? "",
+        email,
         name: user.fullName ?? undefined,
         imageUrl: user.imageUrl,
       });

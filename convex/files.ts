@@ -1,44 +1,10 @@
 import { v } from "convex/values";
-import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
-
-// Helper: Get authenticated user or throw
-async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("Not authenticated");
-  }
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-    .first();
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  return user;
-}
-
-// Helper: Authorize moodboard access
-async function authorizeMoodboardAccess(
-  ctx: QueryCtx | MutationCtx,
-  moodboardId: Id<"moodboards">
-) {
-  const user = await getAuthenticatedUser(ctx);
-
-  const moodboard = await ctx.db.get(moodboardId);
-  if (!moodboard) {
-    throw new Error("Moodboard not found");
-  }
-
-  if (moodboard.userId !== user._id) {
-    throw new Error("Not authorized to access this moodboard");
-  }
-
-  return { user, moodboard };
-}
+import {
+  getAuthenticatedUser,
+  authorizeMoodboardAccess,
+} from "./auth-helpers";
 
 // Generate upload URL for file storage
 export const generateUploadUrl = mutation({
@@ -85,10 +51,27 @@ export const saveFile = mutation({
   },
 });
 
-// Get file URL by storage ID
+// Get file URL by storage ID - requires authentication and ownership verification
 export const getUrl = query({
   args: { storageId: v.id("_storage") },
   handler: async (ctx, args) => {
+    // Require authentication
+    const user = await getAuthenticatedUser(ctx);
+
+    // Verify the user owns a file with this storage ID
+    const file = await ctx.db
+      .query("files")
+      .filter((q) => q.eq(q.field("storageId"), args.storageId))
+      .first();
+
+    if (!file) {
+      throw new Error("File not found");
+    }
+
+    if (file.userId !== user._id) {
+      throw new Error("Not authorized to access this file");
+    }
+
     return await ctx.storage.getUrl(args.storageId);
   },
 });

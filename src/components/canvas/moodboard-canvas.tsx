@@ -48,13 +48,11 @@ export interface CanvasState {
 interface MoodboardCanvasProps {
   initialState?: CanvasState;
   onStateChange?: (state: CanvasState) => void;
-  onSaveStatus?: (status: "saving" | "saved" | "error") => void;
 }
 
 export function MoodboardCanvas({
   initialState,
   onStateChange,
-  onSaveStatus,
 }: MoodboardCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
@@ -71,32 +69,19 @@ export function MoodboardCanvas({
     setEdges,
   });
 
-  // Debounced save
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
+  // Notify parent of state changes (debounced in parent)
   const handleStateChange = useCallback(() => {
     if (!reactFlowInstance || !onStateChange) return;
 
-    // Clear existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    const viewport = reactFlowInstance.getViewport();
+    onStateChange({
+      nodes,
+      edges,
+      viewport,
+    });
+  }, [nodes, edges, reactFlowInstance, onStateChange]);
 
-    onSaveStatus?.("saving");
-
-    // Debounce save by 300ms
-    saveTimeoutRef.current = setTimeout(() => {
-      const viewport = reactFlowInstance.getViewport();
-      onStateChange({
-        nodes,
-        edges,
-        viewport,
-      });
-      onSaveStatus?.("saved");
-    }, 300);
-  }, [nodes, edges, reactFlowInstance, onStateChange, onSaveStatus]);
-
-  // Trigger save on changes
+  // Trigger state change notification on changes
   useEffect(() => {
     handleStateChange();
   }, [nodes, edges, handleStateChange]);
@@ -193,9 +178,30 @@ export function MoodboardCanvas({
     event.dataTransfer.dropEffect = "move";
   }, []);
 
+  // Check if the active element is an editable field
+  const isEditingText = useCallback(() => {
+    const activeElement = document.activeElement;
+    if (!activeElement) return false;
+
+    // Check for input, textarea, or contenteditable elements
+    if (activeElement instanceof HTMLInputElement) return true;
+    if (activeElement instanceof HTMLTextAreaElement) return true;
+    if ((activeElement as HTMLElement).isContentEditable) return true;
+
+    // Check for elements with contenteditable attribute
+    if (activeElement.getAttribute("contenteditable") === "true") return true;
+
+    return false;
+  }, []);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Skip keyboard shortcuts when user is editing text
+      if (isEditingText()) {
+        return;
+      }
+
       // Undo: Cmd/Ctrl + Z
       if ((event.metaKey || event.ctrlKey) && event.key === "z" && !event.shiftKey) {
         event.preventDefault();
@@ -209,9 +215,10 @@ export function MoodboardCanvas({
         event.preventDefault();
         redo();
       }
-      // Delete selected nodes
+      // Delete selected nodes (only when not editing)
       if (event.key === "Delete" || event.key === "Backspace") {
         if (selectedNodes.length > 0) {
+          event.preventDefault();
           pushState();
           setNodes((nds) => nds.filter((n) => !selectedNodes.includes(n.id)));
           setEdges((eds) =>
@@ -225,7 +232,7 @@ export function MoodboardCanvas({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [undo, redo, selectedNodes, setNodes, setEdges, pushState]);
+  }, [undo, redo, selectedNodes, setNodes, setEdges, pushState, isEditingText]);
 
   // Add new node from toolbar
   const addNode = useCallback(
@@ -275,7 +282,7 @@ export function MoodboardCanvas({
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.1}
         maxZoom={4}
-        deleteKeyCode={["Delete", "Backspace"]}
+        deleteKeyCode={null}
         multiSelectionKeyCode={["Shift", "Meta", "Control"]}
         className="bg-neutral-50"
       >

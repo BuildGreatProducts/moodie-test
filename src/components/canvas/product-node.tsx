@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import { NodeProps, Handle, Position, NodeResizer } from "@xyflow/react";
 import { ExternalLink, Package, X } from "lucide-react";
 
@@ -15,6 +15,15 @@ export interface ProductNodeData {
 function ProductNodeComponent({ data, selected }: NodeProps) {
   const nodeData = data as ProductNodeData;
   const [imageError, setImageError] = useState(false);
+  const previousUrlRef = useRef<string | undefined>(undefined);
+
+  // Reset imageError when URL changes
+  useEffect(() => {
+    if (nodeData.imageUrl !== previousUrlRef.current) {
+      setImageError(false);
+      previousUrlRef.current = nodeData.imageUrl;
+    }
+  }, [nodeData.imageUrl]);
 
   const formatPrice = (price: number, currency?: string) => {
     return new Intl.NumberFormat("en-US", {
