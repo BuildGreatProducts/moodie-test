@@ -94,6 +94,7 @@ export default defineSchema({
     .index("by_category", ["category"])
     .index("by_room_type", ["roomType"])
     .index("by_style", ["style"])
+    .index("by_isPublic", ["isPublic"])
     .searchIndex("search_products", {
       searchField: "name",
       filterFields: ["userId", "category", "roomType", "style"],

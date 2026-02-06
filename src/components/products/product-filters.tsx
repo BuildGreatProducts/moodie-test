@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, X } from "lucide-react";
+
+// Helper to properly pluralize labels (e.g., Category -> Categories)
+function pluralize(label: string): string {
+  if (label.toLowerCase().endsWith("y")) {
+    return label.slice(0, -1) + "ies";
+  }
+  return label + "s";
+}
 
 interface FilterOption {
   value: string;
@@ -64,7 +72,7 @@ function FilterDropdown({ label, options, value, onChange }: FilterDropdownProps
                 !value ? "font-medium text-primary-600" : "text-neutral-600"
               }`}
             >
-              All {label}s
+              All {pluralize(label)}
             </button>
             {options.map((option) => (
               <button
@@ -108,6 +116,12 @@ export function ProductFilters({
   const [showPriceFilter, setShowPriceFilter] = useState(false);
   const [localMinPrice, setLocalMinPrice] = useState(minPrice?.toString() || "");
   const [localMaxPrice, setLocalMaxPrice] = useState(maxPrice?.toString() || "");
+
+  // Sync local price inputs with external props (e.g., when "Clear all" is clicked)
+  useEffect(() => {
+    setLocalMinPrice(minPrice?.toString() || "");
+    setLocalMaxPrice(maxPrice?.toString() || "");
+  }, [minPrice, maxPrice]);
 
   const hasActiveFilters =
     selectedCategory || selectedRoomType || selectedStyle || minPrice !== undefined || maxPrice !== undefined;

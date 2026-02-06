@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import { ExternalLink, GripVertical, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -37,11 +37,24 @@ function ProductCardComponent({
   const [imageError, setImageError] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
+  // Reset imageError when product.imageUrl changes
+  useEffect(() => {
+    setImageError(false);
+  }, [product.imageUrl]);
+
   const formatPrice = (price: number, currency?: string) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: currency || "USD",
-    }).format(price);
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: currency || "USD",
+      }).format(price);
+    } catch {
+      // Fallback for invalid currency codes
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(price);
+    }
   };
 
   const handleDragStart = (e: React.DragEvent) => {

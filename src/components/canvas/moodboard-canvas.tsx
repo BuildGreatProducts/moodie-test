@@ -40,6 +40,17 @@ const nodeTypes: NodeTypes = {
 // Custom edge types (using defaults for now)
 const edgeTypes: EdgeTypes = {};
 
+// Safe JSON parser for drag data
+function safeParseDragData(data: string | null | undefined): Record<string, unknown> {
+  if (!data) return {};
+  try {
+    const parsed = JSON.parse(data);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 export interface CanvasState {
   nodes: Node[];
   edges: Edge[];
@@ -165,7 +176,7 @@ export function MoodboardCanvas({
         id: `${type}-${Date.now()}`,
         type,
         position,
-        data: data ? JSON.parse(data) : {},
+        data: safeParseDragData(data),
       };
 
       pushState();

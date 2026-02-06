@@ -148,7 +148,18 @@ export const get = query({
     id: v.id("products"),
   },
   handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx);
     const product = await ctx.db.get(args.id);
+
+    if (!product) {
+      return null;
+    }
+
+    // Check if user owns the product or if it's public
+    if (product.userId !== user._id && !product.isPublic) {
+      throw new Error("Not authorized to view this product");
+    }
+
     return product;
   },
 });
@@ -277,7 +288,7 @@ export const browse = query({
     const user = await getAuthenticatedUser(ctx);
     const limit = args.limit ?? 20;
 
-    // Get user's products
+    // Get user's products using index
     const myProducts = await ctx.db
       .query("products")
       .withIndex("by_user_id", (q) => q.eq("userId", user._id))
@@ -285,14 +296,19 @@ export const browse = query({
 
     let allProducts = myProducts;
 
-    // If not filtering to only user's products, include public products
+    // If not filtering to only user's products, include public products using index
     if (!args.onlyMine) {
-      // Get all products and filter to public ones not owned by user
-      const allDbProducts = await ctx.db.query("products").collect();
-      const publicProducts = allDbProducts.filter(
-        (p) => p.isPublic && p.userId !== user._id
+      // Use by_isPublic index to efficiently get public products
+      const publicProducts = await ctx.db
+        .query("products")
+        .withIndex("by_isPublic", (q) => q.eq("isPublic", true))
+        .collect();
+
+      // Filter out user's own products from public list to avoid duplicates
+      const otherPublicProducts = publicProducts.filter(
+        (p) => p.userId !== user._id
       );
-      allProducts = [...myProducts, ...publicProducts];
+      allProducts = [...myProducts, ...otherPublicProducts];
     }
 
     // Apply filters

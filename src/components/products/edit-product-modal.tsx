@@ -68,6 +68,7 @@ export function EditProductModal({
   onProductUpdated,
 }: EditProductModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
     description: "",
@@ -83,9 +84,9 @@ export function EditProductModal({
   const updateProduct = useMutation(api.products.update);
   const { toast } = useToast();
 
-  // Initialize form data from product
+  // Initialize form data from product when modal opens
   useEffect(() => {
-    if (product) {
+    if (isOpen && product) {
       setFormData({
         name: product.name || "",
         description: product.description || "",
@@ -97,8 +98,9 @@ export function EditProductModal({
         roomType: product.roomType || "",
         style: product.style || "",
       });
+      setImageError(false); // Reset image error when modal opens
     }
-  }, [product]);
+  }, [isOpen, product]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,21 +190,27 @@ export function EditProductModal({
                 <input
                   type="url"
                   value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, imageUrl: e.target.value });
+                    setImageError(false); // Reset error when URL changes
+                  }}
                   placeholder="https://example.com/image.jpg"
                   className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
                 />
                 {formData.imageUrl && (
                   <div className="relative h-10 w-10 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
-                    <img
-                      src={formData.imageUrl}
-                      alt="Preview"
-                      className="h-full w-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                    <ImageIcon className="absolute inset-0 m-auto h-4 w-4 text-neutral-300" />
+                    {!imageError && (
+                      <img
+                        key={formData.imageUrl}
+                        src={formData.imageUrl}
+                        alt="Preview"
+                        className="h-full w-full object-cover"
+                        onError={() => setImageError(true)}
+                      />
+                    )}
+                    {imageError && (
+                      <ImageIcon className="absolute inset-0 m-auto h-4 w-4 text-neutral-300" />
+                    )}
                   </div>
                 )}
               </div>

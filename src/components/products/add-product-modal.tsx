@@ -66,6 +66,7 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [scrapeError, setScrapeError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
     description: "",
@@ -86,6 +87,7 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
     setUrl("");
     setIsLoading(false);
     setScrapeError(null);
+    setImageError(false);
     setFormData({
       name: "",
       description: "",
@@ -152,6 +154,9 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
   };
 
   const handleManualEntry = () => {
+    // Don't allow manual entry while scraping is in progress
+    if (isLoading) return;
+
     setFormData({
       ...formData,
       sourceUrl: url.trim(),
@@ -269,7 +274,9 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
 
             <button
               onClick={handleManualEntry}
-              className="w-full rounded-lg border border-neutral-200 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+              disabled={isLoading}
+              aria-busy={isLoading}
+              className="w-full rounded-lg border border-neutral-200 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Add manually
             </button>
@@ -308,21 +315,27 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
                   <input
                     type="url"
                     value={formData.imageUrl}
-                    onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, imageUrl: e.target.value });
+                      setImageError(false); // Reset error when URL changes
+                    }}
                     placeholder="https://example.com/image.jpg"
                     className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none transition-colors focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
                   />
                   {formData.imageUrl && (
                     <div className="relative h-10 w-10 overflow-hidden rounded border border-neutral-200 bg-neutral-100">
-                      <img
-                        src={formData.imageUrl}
-                        alt="Preview"
-                        className="h-full w-full object-cover"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                      <ImageIcon className="absolute inset-0 m-auto h-4 w-4 text-neutral-300" />
+                      {!imageError && (
+                        <img
+                          key={formData.imageUrl}
+                          src={formData.imageUrl}
+                          alt="Preview"
+                          className="h-full w-full object-cover"
+                          onError={() => setImageError(true)}
+                        />
+                      )}
+                      {imageError && (
+                        <ImageIcon className="absolute inset-0 m-auto h-4 w-4 text-neutral-300" />
+                      )}
                     </div>
                   )}
                 </div>
