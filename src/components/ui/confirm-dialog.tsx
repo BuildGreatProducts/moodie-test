@@ -76,14 +76,13 @@ export function ConfirmDialog({
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - z-index lower than dialog wrapper */}
       <div
-        className="fixed inset-0 z-50 bg-black/50"
+        className="fixed inset-0 z-40 bg-black/50"
         aria-hidden="true"
-        onClick={isLoading ? undefined : onCancel}
       />
 
-      {/* Dialog */}
+      {/* Dialog wrapper - handles backdrop click */}
       <div
         ref={dialogRef}
         role="dialog"
@@ -92,8 +91,13 @@ export function ConfirmDialog({
         aria-describedby={messageId}
         tabIndex={-1}
         className="fixed inset-0 z-50 flex items-center justify-center"
+        onClick={isLoading ? undefined : onCancel}
       >
-        <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-soft-xl">
+        {/* Dialog content - stop propagation to prevent backdrop close */}
+        <div
+          className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-soft-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Close button */}
           <button
             onClick={onCancel}

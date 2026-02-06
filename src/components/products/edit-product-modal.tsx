@@ -123,7 +123,11 @@ export function EditProductModal({
         description: formData.description.trim() || undefined,
         imageUrl: formData.imageUrl.trim() || undefined,
         sourceUrl: formData.sourceUrl.trim() || undefined,
-        price: formData.price ? Number(formData.price) : undefined,
+        price: (() => {
+          if (!formData.price) return undefined;
+          const parsed = Number(formData.price);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        })(),
         currency: formData.currency || undefined,
         category: formData.category || undefined,
         roomType: formData.roomType || undefined,

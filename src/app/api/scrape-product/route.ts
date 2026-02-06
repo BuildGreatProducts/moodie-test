@@ -104,6 +104,8 @@ async function readBodyWithLimit(
         if (remaining > 0) {
           chunks.push(value.slice(0, remaining));
         }
+        // Cancel the stream to close the underlying connection
+        await reader.cancel().catch(() => {});
         break;
       }
       chunks.push(value);

@@ -161,19 +161,19 @@ export function MoodboardCanvas({
 
       if (!reactFlowInstance || !reactFlowWrapper.current) return;
 
-      const bounds = reactFlowWrapper.current.getBoundingClientRect();
       const type = event.dataTransfer.getData("application/reactflow/type");
       const data = event.dataTransfer.getData("application/reactflow/data");
 
       if (!type) return;
 
+      // Use absolute screen coordinates for screenToFlowPosition
       const position = reactFlowInstance.screenToFlowPosition({
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top,
+        x: event.clientX,
+        y: event.clientY,
       });
 
       const newNode: Node = {
-        id: `${type}-${Date.now()}`,
+        id: `${type}-${crypto.randomUUID()}`,
         type,
         position,
         data: safeParseDragData(data),
@@ -260,7 +260,7 @@ export function MoodboardCanvas({
       });
 
       const newNode: Node = {
-        id: `${type}-${Date.now()}`,
+        id: `${type}-${crypto.randomUUID()}`,
         type,
         position,
         data,

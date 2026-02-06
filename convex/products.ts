@@ -55,11 +55,18 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx);
+
+    // Validate and trim name
+    const trimmedName = args.name.trim();
+    if (!trimmedName) {
+      throw new Error("Product name is required");
+    }
+
     const now = Date.now();
 
     const productId = await ctx.db.insert("products", {
       userId: user._id,
-      name: args.name,
+      name: trimmedName,
       description: args.description,
       imageUrl: args.imageUrl,
       sourceUrl: args.sourceUrl,

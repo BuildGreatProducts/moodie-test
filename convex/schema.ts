@@ -121,7 +121,7 @@ export default defineSchema({
   files: defineTable({
     userId: v.id("users"),
     moodboardId: v.optional(v.id("moodboards")),
-    storageId: v.string(),
+    storageId: v.id("_storage"),
     fileName: v.string(),
     fileType: v.string(),
     fileSize: v.number(),

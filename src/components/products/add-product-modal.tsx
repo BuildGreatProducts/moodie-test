@@ -122,7 +122,15 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
       });
 
       if (!response.ok) {
-        throw new Error("Failed to scrape product data");
+        // Try to extract error message from response
+        let errorMessage = "Failed to scrape product data";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.message || response.statusText || errorMessage;
+        } catch {
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
@@ -184,7 +192,11 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
         description: formData.description.trim() || undefined,
         imageUrl: formData.imageUrl.trim() || undefined,
         sourceUrl: formData.sourceUrl.trim() || undefined,
-        price: formData.price ? Number(formData.price) : undefined,
+        price: (() => {
+          if (!formData.price) return undefined;
+          const parsed = Number(formData.price);
+          return Number.isFinite(parsed) ? parsed : undefined;
+        })(),
         currency: formData.currency || undefined,
         category: formData.category || undefined,
         roomType: formData.roomType || undefined,
