@@ -63,7 +63,7 @@ export function ProductLibraryPanel({ onAddProductToCanvas }: ProductLibraryPane
   const browseResults = useQuery(
     api.products.browse,
     debouncedSearch
-      ? undefined // Use search when there's a query
+      ? "skip" // Use search when there's a query
       : {
           category: selectedCategory,
           roomType: selectedRoomType,
@@ -263,8 +263,8 @@ export function ProductLibraryPanel({ onAddProductToCanvas }: ProductLibraryPane
                 <div className="grid grid-cols-2 gap-2">
                   {products.map((product) => (
                     <ProductCard
-                      key={product._id}
-                      product={product as ProductCardData}
+                      key={String(product._id)}
+                      product={product as unknown as ProductCardData}
                       onDragStart={handleDragStart}
                       onDoubleClick={handleDoubleClick}
                       onEdit={setEditingProduct}

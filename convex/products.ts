@@ -64,22 +64,26 @@ export const create = mutation({
 
     const now = Date.now();
 
-    const productId = await ctx.db.insert("products", {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const productData: any = {
       userId: user._id,
       name: trimmedName,
-      description: args.description,
-      imageUrl: args.imageUrl,
-      sourceUrl: args.sourceUrl,
-      price: args.price,
       currency: args.currency || "USD",
-      category: args.category,
-      roomType: args.roomType,
-      style: args.style,
-      tags: args.tags,
       isPublic: args.isPublic ?? false,
       createdAt: now,
       updatedAt: now,
-    });
+    };
+    if (args.description !== undefined) productData.description = args.description;
+    if (args.imageUrl !== undefined) productData.imageUrl = args.imageUrl;
+    if (args.sourceUrl !== undefined) productData.sourceUrl = args.sourceUrl;
+    if (args.price !== undefined) productData.price = args.price;
+    if (args.category !== undefined) productData.category = args.category;
+    if (args.roomType !== undefined) productData.roomType = args.roomType;
+    if (args.style !== undefined) productData.style = args.style;
+    if (args.tags !== undefined) productData.tags = args.tags;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const productId = await (ctx.db as any).insert("products", productData);
 
     return productId;
   },
@@ -217,7 +221,8 @@ export const listMyProducts = query({
     }
 
     // Sort by creation date descending
-    filteredProducts.sort((a, b) => b.createdAt - a.createdAt);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    filteredProducts.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
 
     // Apply cursor-based pagination
     let startIndex = 0;
@@ -280,10 +285,12 @@ export const search = query({
 
     // Apply price filter in memory
     if (args.minPrice !== undefined || args.maxPrice !== undefined) {
-      results = results.filter((p) => {
-        if (p.price === undefined) return false;
-        if (args.minPrice !== undefined && p.price < args.minPrice) return false;
-        if (args.maxPrice !== undefined && p.price > args.maxPrice) return false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      results = results.filter((p: any) => {
+        const price = p.price as number | undefined;
+        if (price === undefined) return false;
+        if (args.minPrice !== undefined && price < args.minPrice) return false;
+        if (args.maxPrice !== undefined && price > args.maxPrice) return false;
         return true;
       });
     }
@@ -344,18 +351,23 @@ export const browse = query({
       filteredProducts = filteredProducts.filter((p) => p.style === args.style);
     }
     if (args.minPrice !== undefined) {
-      filteredProducts = filteredProducts.filter(
-        (p) => p.price !== undefined && p.price >= args.minPrice!
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      filteredProducts = filteredProducts.filter((p: any) => {
+        const price = p.price as number | undefined;
+        return price !== undefined && price >= args.minPrice!;
+      });
     }
     if (args.maxPrice !== undefined) {
-      filteredProducts = filteredProducts.filter(
-        (p) => p.price !== undefined && p.price <= args.maxPrice!
-      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      filteredProducts = filteredProducts.filter((p: any) => {
+        const price = p.price as number | undefined;
+        return price !== undefined && price <= args.maxPrice!;
+      });
     }
 
     // Sort by creation date descending
-    filteredProducts.sort((a, b) => b.createdAt - a.createdAt);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    filteredProducts.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
 
     // Apply cursor-based pagination
     let startIndex = 0;
@@ -408,14 +420,17 @@ export const getFilterOptions = query({
     const styleCounts: Record<string, number> = {};
 
     for (const product of products) {
-      if (product.category) {
-        categoryCounts[product.category] = (categoryCounts[product.category] || 0) + 1;
+      const category = String(product.category || "");
+      const roomType = String(product.roomType || "");
+      const style = String(product.style || "");
+      if (category) {
+        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
       }
-      if (product.roomType) {
-        roomTypeCounts[product.roomType] = (roomTypeCounts[product.roomType] || 0) + 1;
+      if (roomType) {
+        roomTypeCounts[roomType] = (roomTypeCounts[roomType] || 0) + 1;
       }
-      if (product.style) {
-        styleCounts[product.style] = (styleCounts[product.style] || 0) + 1;
+      if (style) {
+        styleCounts[style] = (styleCounts[style] || 0) + 1;
       }
     }
 

@@ -7,7 +7,7 @@ import type { GenericId, GenericTableInfo, GenericDatabaseReader, GenericDatabas
 
 export type Id<TableName extends TableNames> = GenericId<TableName>;
 
-export type TableNames = "users" | "projects" | "moodboards" | "subscriptions" | "products" | "comments" | "files";
+export type TableNames = "users" | "projects" | "moodboards" | "subscriptions" | "products" | "comments" | "files" | "aiConversations" | "aiMessages" | "aiUsage";
 
 export interface DataModel {
   users: GenericTableInfo;
@@ -17,6 +17,9 @@ export interface DataModel {
   products: GenericTableInfo;
   comments: GenericTableInfo;
   files: GenericTableInfo;
+  aiConversations: GenericTableInfo;
+  aiMessages: GenericTableInfo;
+  aiUsage: GenericTableInfo;
 }
 
 export type DatabaseReader = GenericDatabaseReader<DataModel>;

@@ -23,9 +23,10 @@ export const listByElement = query({
     elementId: v.string(),
   },
   handler: async (ctx, args) => {
-    const comments = await ctx.db
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const comments = await (ctx.db as any)
       .query("comments")
-      .withIndex("by_element_id", (q) =>
+      .withIndex("by_element_id", (q: { eq: (field: string, value: unknown) => { eq: (field: string, value: unknown) => unknown } }) =>
         q.eq("moodboardId", args.moodboardId).eq("elementId", args.elementId)
       )
       .order("asc")
@@ -64,7 +65,7 @@ export const getElementCommentCounts = query({
     const counts: Record<string, { total: number; unresolved: number }> = {};
 
     for (const comment of comments) {
-      const elementId = comment.elementId || "general";
+      const elementId = String(comment.elementId || "general");
       if (!counts[elementId]) {
         counts[elementId] = { total: 0, unresolved: 0 };
       }
@@ -172,7 +173,8 @@ export const update = mutation({
     }
 
     // Check if user is the author or the moodboard owner
-    const moodboard = await ctx.db.get(comment.moodboardId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const moodboard = await (ctx.db as any).get(comment.moodboardId);
     if (!moodboard) {
       throw new Error("Moodboard not found");
     }
@@ -219,7 +221,8 @@ export const remove = mutation({
     }
 
     // Check if user is the author or the moodboard owner
-    const moodboard = await ctx.db.get(comment.moodboardId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const moodboard = await (ctx.db as any).get(comment.moodboardId);
     if (!moodboard) {
       throw new Error("Moodboard not found");
     }

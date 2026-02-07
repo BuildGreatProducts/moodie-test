@@ -6,7 +6,6 @@ import {
   X,
   Send,
   Loader2,
-  ChevronLeft,
   ChevronRight,
   ImagePlus,
   Wand2,
@@ -49,14 +48,6 @@ const QUICK_ACTIONS = [
   { icon: Wand2, label: "Edit selected", action: "edit_selected" },
   { icon: Package, label: "Find products", action: "find_products" },
 ];
-
-const SYSTEM_PROMPT = `You are an AI assistant for Moodie, an interior design moodboard platform. Help designers with:
-- Generating room visualizations and design ideas
-- Finding matching products for their designs
-- Arranging and organizing canvas elements
-- Providing design suggestions and inspiration
-
-Be helpful, creative, and focused on interior design. When suggesting actions, be specific about what you'll do.`;
 
 export function AIAssistantPanel({
   moodboardId,

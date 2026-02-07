@@ -16,6 +16,7 @@ import type * as files from "../files.js";
 import type * as comments from "../comments.js";
 import type * as products from "../products.js";
 import type * as ai from "../ai.js";
+import type * as subscriptions from "../subscriptions.js";
 
 declare const fullApi: ApiFromModules<{
   users: typeof users;
@@ -25,6 +26,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   products: typeof products;
   ai: typeof ai;
+  subscriptions: typeof subscriptions;
 }>;
 
 export declare const api: FilterApi<
