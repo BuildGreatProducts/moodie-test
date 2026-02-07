@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthenticatedUser } from "./auth-helpers";
 
 // Plan limits
@@ -236,8 +236,8 @@ export const canPerformAction = query({
   },
 });
 
-// Create or update subscription (called by webhook)
-export const upsertSubscription = mutation({
+// Create or update subscription (called by webhook - internal only)
+export const upsertSubscription = internalMutation({
   args: {
     polarSubscriptionId: v.string(),
     polarCustomerId: v.string(),
@@ -356,8 +356,8 @@ export const reactivateSubscription = mutation({
   },
 });
 
-// Handle subscription status change from webhook
-export const handleSubscriptionStatusChange = mutation({
+// Handle subscription status change from webhook (internal only)
+export const handleSubscriptionStatusChange = internalMutation({
   args: {
     polarSubscriptionId: v.string(),
     status: v.union(
