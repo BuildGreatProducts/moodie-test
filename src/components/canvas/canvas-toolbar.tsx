@@ -19,6 +19,8 @@ import {
   ChevronDown,
   Upload,
   Sparkles,
+  Share2,
+  MessageSquare,
 } from "lucide-react";
 
 interface CanvasToolbarProps {
@@ -34,6 +36,10 @@ interface CanvasToolbarProps {
   setNodes: React.Dispatch<React.SetStateAction<FlowNode[]>>;
   onToggleAI?: () => void;
   isAIOpen?: boolean;
+  onShare?: () => void;
+  commentCount?: { total: number; unresolved: number };
+  onToggleComments?: () => void;
+  isCommentsOpen?: boolean;
 }
 
 export function CanvasToolbar({
@@ -49,6 +55,10 @@ export function CanvasToolbar({
   setNodes,
   onToggleAI,
   isAIOpen,
+  onShare,
+  commentCount,
+  onToggleComments,
+  isCommentsOpen,
 }: CanvasToolbarProps) {
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -318,6 +328,35 @@ export function CanvasToolbar({
         >
           <Grid3X3 className="h-5 w-5" />
         </button>
+      </div>
+
+      {/* Share and Comments group */}
+      <div className="flex items-center gap-1 border-r border-neutral-200 pr-2">
+        {onShare && (
+          <button
+            onClick={onShare}
+            className={toolbarButtonClass}
+            title="Share moodboard"
+          >
+            <Share2 className="h-5 w-5" />
+          </button>
+        )}
+        {onToggleComments && (
+          <button
+            onClick={onToggleComments}
+            className={isCommentsOpen ? activeButtonClass : toolbarButtonClass}
+            title={isCommentsOpen ? "Close comments" : "View comments"}
+          >
+            <div className="relative">
+              <MessageSquare className="h-5 w-5" />
+              {commentCount && commentCount.unresolved > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-medium text-white">
+                  {commentCount.unresolved > 9 ? "9+" : commentCount.unresolved}
+                </span>
+              )}
+            </div>
+          </button>
+        )}
       </div>
 
       {/* AI Assistant toggle */}

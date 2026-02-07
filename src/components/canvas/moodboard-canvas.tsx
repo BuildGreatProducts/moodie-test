@@ -21,11 +21,15 @@ import {
   SelectionMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { ImageNode } from "./image-node";
 import { ProductNode } from "./product-node";
 import { TextNode } from "./text-node";
 import { ColorNode } from "./color-node";
 import { CanvasToolbar } from "./canvas-toolbar";
+import { ShareDialog } from "./share-dialog";
+import { CommentsPanel } from "./comments-panel";
 import { useCanvasHistory } from "@/hooks/use-canvas-history";
 import { ProductLibraryPanel, ProductCardData } from "@/components/products";
 import { AIAssistantPanel } from "@/components/ai";
@@ -77,6 +81,14 @@ export function MoodboardCanvas({
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isCommentsPanelOpen, setIsCommentsPanelOpen] = useState(false);
+
+  // Query comment count for badge
+  const commentCount = useQuery(
+    api.comments.getCommentCount,
+    moodboardId ? { moodboardId } : "skip"
+  );
 
   // History for undo/redo
   const { pushState, undo, redo, canUndo, canRedo } = useCanvasHistory({
@@ -350,6 +362,16 @@ export function MoodboardCanvas({
     setIsAIPanelOpen((prev) => !prev);
   }, []);
 
+  // Toggle share dialog
+  const toggleShareDialog = useCallback(() => {
+    setIsShareDialogOpen((prev) => !prev);
+  }, []);
+
+  // Toggle comments panel
+  const toggleCommentsPanel = useCallback(() => {
+    setIsCommentsPanelOpen((prev) => !prev);
+  }, []);
+
   return (
     <div className="flex h-full w-full">
       {/* Canvas Area */}
@@ -417,6 +439,10 @@ export function MoodboardCanvas({
               setNodes={setNodes}
               onToggleAI={moodboardId ? toggleAIPanel : undefined}
               isAIOpen={isAIPanelOpen}
+              onShare={moodboardId ? toggleShareDialog : undefined}
+              commentCount={commentCount || undefined}
+              onToggleComments={moodboardId ? toggleCommentsPanel : undefined}
+              isCommentsOpen={isCommentsPanelOpen}
             />
           </Panel>
         </ReactFlow>
@@ -435,6 +461,24 @@ export function MoodboardCanvas({
           onToggle={toggleAIPanel}
           onAddImageToCanvas={handleAIAddImage}
           onCanvasAction={handleAICanvasAction}
+        />
+      )}
+
+      {/* Share Dialog */}
+      {moodboardId && (
+        <ShareDialog
+          moodboardId={moodboardId}
+          isOpen={isShareDialogOpen}
+          onClose={() => setIsShareDialogOpen(false)}
+        />
+      )}
+
+      {/* Comments Panel */}
+      {moodboardId && (
+        <CommentsPanel
+          moodboardId={moodboardId}
+          isOpen={isCommentsPanelOpen}
+          onClose={() => setIsCommentsPanelOpen(false)}
         />
       )}
     </div>
