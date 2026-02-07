@@ -218,6 +218,31 @@ export const remove = mutation({
         await ctx.db.delete(file._id as any);
       }
 
+      // Delete AI conversations and their messages for each moodboard
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const aiConversations = await (ctx.db as any)
+        .query("aiConversations")
+        .withIndex("by_moodboard_id", (q: { eq: (f: string, v: unknown) => unknown }) => q.eq("moodboardId", moodboard._id))
+        .collect();
+
+      for (const conversation of aiConversations) {
+        // Delete all messages in this conversation
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const messages = await (ctx.db as any)
+          .query("aiMessages")
+          .withIndex("by_conversation_id", (q: { eq: (f: string, v: unknown) => unknown }) => q.eq("conversationId", conversation._id))
+          .collect();
+
+        for (const message of messages) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (ctx.db as any).delete(message._id);
+        }
+
+        // Delete the conversation
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (ctx.db as any).delete(conversation._id);
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await ctx.db.delete(moodboard._id as any);
     }
