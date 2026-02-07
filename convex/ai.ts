@@ -1,27 +1,77 @@
 import { v } from "convex/values";
-import { mutation, query, action } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthenticatedUser } from "./auth-helpers";
-import { api } from "./_generated/api";
 
-// Get or create a conversation for a moodboard
-export const getOrCreateConversation = query({
+// Get existing conversation for a moodboard (read-only)
+export const getConversation = query({
   args: {
     moodboardId: v.id("moodboards"),
   },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx);
 
-    // Check if conversation exists for this moodboard
+    // Use compound index to find user's conversation for this moodboard
     const existing = await ctx.db
       .query("aiConversations")
-      .withIndex("by_moodboard_id", (q) => q.eq("moodboardId", args.moodboardId))
+      .withIndex("by_moodboard_and_user", (q) =>
+        q.eq("moodboardId", args.moodboardId).eq("userId", user._id)
+      )
+      .first();
+
+    return existing || null;
+  },
+});
+
+// Create a new conversation for a moodboard (write operation)
+export const createConversation = mutation({
+  args: {
+    moodboardId: v.id("moodboards"),
+  },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx);
+
+    // Check if conversation already exists using compound index
+    const existing = await ctx.db
+      .query("aiConversations")
+      .withIndex("by_moodboard_and_user", (q) =>
+        q.eq("moodboardId", args.moodboardId).eq("userId", user._id)
+      )
       .first();
 
     if (existing) {
-      // Verify ownership
-      if (existing.userId !== user._id) {
-        throw new Error("Not authorized to access this conversation");
-      }
+      return existing;
+    }
+
+    // Create new conversation
+    const now = Date.now();
+    const conversationId = await ctx.db.insert("aiConversations", {
+      userId: user._id,
+      moodboardId: args.moodboardId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return await ctx.db.get(conversationId);
+  },
+});
+
+// Legacy query name for backwards compatibility - now uses mutation
+export const getOrCreateConversation = mutation({
+  args: {
+    moodboardId: v.id("moodboards"),
+  },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx);
+
+    // Use compound index to find user's conversation for this moodboard
+    const existing = await ctx.db
+      .query("aiConversations")
+      .withIndex("by_moodboard_and_user", (q) =>
+        q.eq("moodboardId", args.moodboardId).eq("userId", user._id)
+      )
+      .first();
+
+    if (existing) {
       return existing;
     }
 
@@ -64,8 +114,8 @@ export const getMessages = query({
   },
 });
 
-// Internal mutation to add a message
-export const addMessage = mutation({
+// Internal mutation to add a message (server-only, not callable by clients)
+export const addMessage = internalMutation({
   args: {
     conversationId: v.id("aiConversations"),
     role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
@@ -258,6 +308,17 @@ export const generateImage = mutation({
       throw new Error("Prompt is required");
     }
 
+    // If conversationId provided, verify ownership before inserting message
+    if (args.conversationId) {
+      const conversation = await ctx.db.get(args.conversationId);
+      if (!conversation) {
+        throw new Error("Conversation not found");
+      }
+      if (conversation.userId !== user._id) {
+        throw new Error("Not authorized to add messages to this conversation");
+      }
+    }
+
     // Track usage
     await ctx.db.insert("aiUsage", {
       userId: user._id,
@@ -280,7 +341,7 @@ export const generateImage = mutation({
     const imageUrl =
       placeholderImages[Math.floor(Math.random() * placeholderImages.length)];
 
-    // If there's a conversation, add the generation as a message
+    // If there's a conversation, add the generation as a message (ownership already verified)
     if (args.conversationId) {
       await ctx.db.insert("aiMessages", {
         conversationId: args.conversationId,
@@ -329,6 +390,44 @@ export const getUsageStats = query({
       imageEdit: imageEditCount,
       total: usage.length,
     };
+  },
+});
+
+// Update action status on a message (for accepting/rejecting suggested actions)
+export const updateActionStatus = mutation({
+  args: {
+    messageId: v.id("aiMessages"),
+    status: v.union(v.literal("executed"), v.literal("rejected")),
+  },
+  handler: async (ctx, args) => {
+    const user = await getAuthenticatedUser(ctx);
+
+    // Get the message
+    const message = await ctx.db.get(args.messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+
+    // Verify ownership by checking the conversation
+    const conversation = await ctx.db.get(message.conversationId);
+    if (!conversation || conversation.userId !== user._id) {
+      throw new Error("Not authorized to update this message");
+    }
+
+    // Check if message has an action
+    if (!message.action) {
+      throw new Error("Message does not have an action to update");
+    }
+
+    // Update the action status
+    await ctx.db.patch(args.messageId, {
+      action: {
+        ...message.action,
+        status: args.status,
+      },
+    });
+
+    return { success: true };
   },
 });
 

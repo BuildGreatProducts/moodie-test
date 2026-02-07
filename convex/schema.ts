@@ -140,7 +140,8 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_user_id", ["userId"])
-    .index("by_moodboard_id", ["moodboardId"]),
+    .index("by_moodboard_id", ["moodboardId"])
+    .index("by_moodboard_and_user", ["moodboardId", "userId"]),
 
   // AI Messages table
   aiMessages: defineTable({

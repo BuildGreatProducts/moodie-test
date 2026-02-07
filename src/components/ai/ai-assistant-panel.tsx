@@ -79,6 +79,7 @@ export function AIAssistantPanel({
     conversation ? { conversationId: conversation._id } : "skip"
   );
   const sendMessage = useMutation(api.ai.sendMessage);
+  const updateActionStatus = useMutation(api.ai.updateActionStatus);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -151,17 +152,36 @@ export function AIAssistantPanel({
   };
 
   const handleAcceptAction = useCallback(
-    (messageId: string, action: NonNullable<Message["action"]>) => {
+    async (messageId: string, action: NonNullable<Message["action"]>) => {
       if (action.type && action.payload && onCanvasAction) {
         try {
           const payload = JSON.parse(action.payload);
           onCanvasAction({ type: action.type, payload });
+          // Mark action as executed
+          await updateActionStatus({
+            messageId: messageId as Id<"aiMessages">,
+            status: "executed",
+          });
         } catch {
           console.error("Failed to parse action payload");
         }
       }
     },
-    [onCanvasAction]
+    [onCanvasAction, updateActionStatus]
+  );
+
+  const handleDismissAction = useCallback(
+    async (messageId: string) => {
+      try {
+        await updateActionStatus({
+          messageId: messageId as Id<"aiMessages">,
+          status: "rejected",
+        });
+      } catch {
+        console.error("Failed to dismiss action");
+      }
+    },
+    [updateActionStatus]
   );
 
   const handleAddGeneratedImage = useCallback(
@@ -242,7 +262,10 @@ export function AIAssistantPanel({
               >
                 Apply changes
               </button>
-              <button className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-300">
+              <button
+                onClick={() => handleDismissAction(msg.id)}
+                className="rounded-lg bg-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-700 transition-colors hover:bg-neutral-300"
+              >
                 Dismiss
               </button>
             </div>
@@ -447,6 +470,18 @@ function GenerateRoomModal({
 
   const generateImage = useMutation(api.ai.generateImage);
 
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isGenerating) {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isGenerating, onClose]);
+
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
 
@@ -463,10 +498,10 @@ function GenerateRoomModal({
         style: style || undefined,
       });
 
-      if (result.imageUrl) {
+      if (result.success && result.imageUrl) {
         setGeneratedImage(result.imageUrl);
-      } else if (result.error) {
-        setError(result.error);
+      } else {
+        setError("Image generation failed. Please try again.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to generate image");
@@ -486,9 +521,22 @@ function GenerateRoomModal({
     }
   };
 
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !isGenerating) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
-      <div className="relative w-full max-w-lg rounded-xl bg-white p-6 shadow-soft-xl">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+      onClick={handleBackdropClick}
+    >
+      <div
+        className="relative w-full max-w-lg rounded-xl bg-white p-6 shadow-soft-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"

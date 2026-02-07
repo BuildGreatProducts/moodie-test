@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Node } from "@xyflow/react";
 import {
   ImagePlus,
@@ -52,6 +52,31 @@ export function CanvasToolbar({
 }: CanvasToolbarProps) {
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const alignMenuRef = useRef<HTMLDivElement>(null);
+  const alignToggleRef = useRef<HTMLButtonElement>(null);
+
+  // Click-outside handler for alignment menu
+  useEffect(() => {
+    if (!showAlignMenu) return;
+
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node;
+      const isOutsideMenu = alignMenuRef.current && !alignMenuRef.current.contains(target);
+      const isOutsideToggle = alignToggleRef.current && !alignToggleRef.current.contains(target);
+
+      if (isOutsideMenu && isOutsideToggle) {
+        setShowAlignMenu(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("touchstart", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+    };
+  }, [showAlignMenu]);
 
   const handleImageUpload = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,6 +222,7 @@ export function CanvasToolbar({
       {/* Alignment group */}
       <div className="relative flex items-center gap-1 border-r border-neutral-200 pr-2">
         <button
+          ref={alignToggleRef}
           onClick={() => setShowAlignMenu(!showAlignMenu)}
           disabled={selectedNodes.length < 2}
           className={toolbarButtonClass}
@@ -207,7 +233,10 @@ export function CanvasToolbar({
         </button>
 
         {showAlignMenu && (
-          <div className="absolute left-0 top-full z-50 mt-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
+          <div
+            ref={alignMenuRef}
+            className="absolute left-0 top-full z-50 mt-1 rounded-lg border border-neutral-200 bg-white p-2 shadow-lg"
+          >
             <div className="mb-2 text-xs font-medium text-neutral-500">Horizontal</div>
             <div className="mb-3 flex gap-1">
               <button
