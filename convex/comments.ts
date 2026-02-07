@@ -1,11 +1,52 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx } from "./_generated/server";
 import { authorizeMoodboardAccess } from "./auth-helpers";
+import { Id } from "./_generated/dataModel";
+
+// Helper to check if user can access comments on a moodboard
+// Returns true if: user is authenticated and owns the moodboard, OR moodboard has sharing enabled
+async function canAccessComments(
+  ctx: QueryCtx,
+  moodboardId: Id<"moodboards">
+): Promise<boolean> {
+  const moodboard = await ctx.db.get(moodboardId);
+  if (!moodboard) {
+    return false;
+  }
+
+  // Check if user is authenticated
+  const identity = await ctx.auth.getUserIdentity();
+  if (identity) {
+    // Get user from database
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    // If user owns the moodboard, allow access
+    if (user && moodboard.userId === user._id) {
+      return true;
+    }
+  }
+
+  // If sharing is enabled, allow access (for clients viewing shared moodboards)
+  if (moodboard.shareEnabled) {
+    return true;
+  }
+
+  return false;
+}
 
 // List all comments for a moodboard
 export const listByMoodboard = query({
   args: { moodboardId: v.id("moodboards") },
   handler: async (ctx, args) => {
+    // Check authorization
+    const hasAccess = await canAccessComments(ctx, args.moodboardId);
+    if (!hasAccess) {
+      return []; // Return empty array instead of throwing to avoid leaking info
+    }
+
     const comments = await ctx.db
       .query("comments")
       .withIndex("by_moodboard_id", (q) => q.eq("moodboardId", args.moodboardId))
@@ -23,6 +64,12 @@ export const listByElement = query({
     elementId: v.string(),
   },
   handler: async (ctx, args) => {
+    // Check authorization
+    const hasAccess = await canAccessComments(ctx, args.moodboardId);
+    if (!hasAccess) {
+      return []; // Return empty array instead of throwing to avoid leaking info
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const comments = await (ctx.db as any)
       .query("comments")
@@ -40,6 +87,12 @@ export const listByElement = query({
 export const getCommentCount = query({
   args: { moodboardId: v.id("moodboards") },
   handler: async (ctx, args) => {
+    // Check authorization
+    const hasAccess = await canAccessComments(ctx, args.moodboardId);
+    if (!hasAccess) {
+      return { total: 0, unresolved: 0 }; // Return zero counts to avoid leaking info
+    }
+
     const comments = await ctx.db
       .query("comments")
       .withIndex("by_moodboard_id", (q) => q.eq("moodboardId", args.moodboardId))
@@ -56,6 +109,12 @@ export const getCommentCount = query({
 export const getElementCommentCounts = query({
   args: { moodboardId: v.id("moodboards") },
   handler: async (ctx, args) => {
+    // Check authorization
+    const hasAccess = await canAccessComments(ctx, args.moodboardId);
+    if (!hasAccess) {
+      return {}; // Return empty object to avoid leaking info
+    }
+
     const comments = await ctx.db
       .query("comments")
       .withIndex("by_moodboard_id", (q) => q.eq("moodboardId", args.moodboardId))
