@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { ConvexClientProvider } from "@/components/providers/convex-client-provider";
+import { AnalyticsProvider } from "@/components/analytics-provider";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
@@ -25,7 +27,11 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <ConvexClientProvider>
-          {children}
+          <Suspense fallback={null}>
+            <AnalyticsProvider>
+              {children}
+            </AnalyticsProvider>
+          </Suspense>
           <Toaster />
         </ConvexClientProvider>
       </body>

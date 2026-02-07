@@ -2,7 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../../../../../convex/_generated/api";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL || "");
+// Lazy initialization to avoid build-time errors when env vars aren't set
+let convexClient: ConvexHttpClient | null = null;
+
+function getConvexClient(): ConvexHttpClient {
+  if (!convexClient) {
+    const url = process.env.NEXT_PUBLIC_CONVEX_URL;
+    if (!url) {
+      throw new Error("NEXT_PUBLIC_CONVEX_URL is not configured");
+    }
+    convexClient = new ConvexHttpClient(url);
+  }
+  return convexClient;
+}
 
 // Polar webhook secret for signature verification
 const POLAR_WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET || "";
@@ -120,7 +132,7 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "Missing customer email" }, { status: 400 });
         }
 
-        await convex.mutation(api.subscriptions.upsertSubscription, {
+        await getConvexClient().mutation(api.subscriptions.upsertSubscription, {
           polarSubscriptionId: subscriptionId,
           polarCustomerId: customerId,
           userEmail: customerEmail,
@@ -140,7 +152,7 @@ export async function POST(request: NextRequest) {
         const subscription = event.data || event;
         const subscriptionId = subscription.id || subscription.subscription_id;
 
-        await convex.mutation(api.subscriptions.handleSubscriptionStatusChange, {
+        await getConvexClient().mutation(api.subscriptions.handleSubscriptionStatusChange, {
           polarSubscriptionId: subscriptionId,
           status: "canceled",
           currentPeriodEnd: subscription.current_period_end
@@ -157,7 +169,7 @@ export async function POST(request: NextRequest) {
         const subscription = event.data || event;
         const subscriptionId = subscription.subscription_id || subscription.id;
 
-        await convex.mutation(api.subscriptions.handleSubscriptionStatusChange, {
+        await getConvexClient().mutation(api.subscriptions.handleSubscriptionStatusChange, {
           polarSubscriptionId: subscriptionId,
           status: "past_due",
         });
