@@ -69,17 +69,48 @@ export function AIAssistantPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [conversationId, setConversationId] = useState<Id<"aiConversations"> | null>(null);
+  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Convex queries and mutations
-  const conversation = useQuery(api.ai.getOrCreateConversation, { moodboardId });
+  // Convex queries and mutations - use getConversation query for reading
+  const existingConversation = useQuery(api.ai.getConversation, { moodboardId });
+  const createConversation = useMutation(api.ai.createConversation);
   const messages = useQuery(
     api.ai.getMessages,
-    conversation ? { conversationId: conversation._id } : "skip"
+    conversationId ? { conversationId } : "skip"
   );
-  const sendMessage = useMutation(api.ai.sendMessage);
+  const sendMessageMutation = useMutation(api.ai.sendMessage);
   const updateActionStatus = useMutation(api.ai.updateActionStatus);
+
+  // Update conversationId when existingConversation changes
+  useEffect(() => {
+    if (existingConversation?._id) {
+      setConversationId(existingConversation._id);
+    }
+  }, [existingConversation]);
+
+  // Helper to ensure conversation exists before operations
+  const ensureConversation = useCallback(async (): Promise<Id<"aiConversations"> | null> => {
+    if (conversationId) return conversationId;
+    if (isCreatingConversation) return null;
+
+    setIsCreatingConversation(true);
+    try {
+      const newConversation = await createConversation({ moodboardId });
+      if (newConversation?._id) {
+        setConversationId(newConversation._id);
+        return newConversation._id;
+      }
+      return null;
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+      return null;
+    } finally {
+      setIsCreatingConversation(false);
+    }
+  }, [conversationId, isCreatingConversation, createConversation, moodboardId]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -94,7 +125,7 @@ export function AIAssistantPanel({
   }, [isOpen]);
 
   const handleSendMessage = useCallback(async () => {
-    if (!message.trim() || isLoading || !conversation) return;
+    if (!message.trim() || isLoading) return;
 
     const userMessage = message.trim();
     setMessage("");
@@ -113,8 +144,14 @@ export function AIAssistantPanel({
     ]);
 
     try {
-      await sendMessage({
-        conversationId: conversation._id,
+      // Ensure we have a conversation (create if needed)
+      const activeConversationId = await ensureConversation();
+      if (!activeConversationId) {
+        throw new Error("Failed to create conversation");
+      }
+
+      await sendMessageMutation({
+        conversationId: activeConversationId,
         content: userMessage,
       });
       // Clear local messages after server responds
@@ -126,7 +163,7 @@ export function AIAssistantPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [message, isLoading, conversation, sendMessage]);
+  }, [message, isLoading, ensureConversation, sendMessageMutation]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -153,18 +190,28 @@ export function AIAssistantPanel({
 
   const handleAcceptAction = useCallback(
     async (messageId: string, action: NonNullable<Message["action"]>) => {
-      if (action.type && action.payload && onCanvasAction) {
+      if (!action.type || !onCanvasAction) return;
+
+      // Parse payload separately to distinguish parse errors
+      let payload: unknown = undefined;
+      if (action.payload) {
         try {
-          const payload = JSON.parse(action.payload);
-          onCanvasAction({ type: action.type, payload });
-          // Mark action as executed
-          await updateActionStatus({
-            messageId: messageId as Id<"aiMessages">,
-            status: "executed",
-          });
-        } catch {
-          console.error("Failed to parse action payload");
+          payload = JSON.parse(action.payload);
+        } catch (parseError) {
+          console.error("Failed to parse action payload:", parseError);
+          return; // Exit early on parse failure
         }
+      }
+
+      // Execute canvas action and update status
+      try {
+        onCanvasAction({ type: action.type, payload });
+        await updateActionStatus({
+          messageId: messageId as Id<"aiMessages">,
+          status: "executed",
+        });
+      } catch (actionError) {
+        console.error("Failed to execute canvas action or update status:", actionError);
       }
     },
     [onCanvasAction, updateActionStatus]
@@ -409,7 +456,7 @@ export function AIAssistantPanel({
       {showGenerateModal && (
         <GenerateRoomModal
           moodboardId={moodboardId}
-          conversationId={conversation?._id}
+          conversationId={conversationId ?? undefined}
           onClose={() => setShowGenerateModal(false)}
           onImageGenerated={(url, prompt) => {
             if (onAddImageToCanvas) {

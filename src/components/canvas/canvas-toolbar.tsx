@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Node } from "@xyflow/react";
+import { Node as FlowNode } from "@xyflow/react";
 import {
   ImagePlus,
   Type,
@@ -30,8 +30,8 @@ interface CanvasToolbarProps {
   snapToGrid: boolean;
   onToggleSnap: () => void;
   selectedNodes: string[];
-  nodes: Node[];
-  setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+  nodes: FlowNode[];
+  setNodes: React.Dispatch<React.SetStateAction<FlowNode[]>>;
   onToggleAI?: () => void;
   isAIOpen?: boolean;
 }
@@ -60,7 +60,7 @@ export function CanvasToolbar({
     if (!showAlignMenu) return;
 
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      const target = event.target as Node;
+      const target = event.target as globalThis.Node;
       const isOutsideMenu = alignMenuRef.current && !alignMenuRef.current.contains(target);
       const isOutsideToggle = alignToggleRef.current && !alignToggleRef.current.contains(target);
 
