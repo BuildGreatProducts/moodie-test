@@ -148,9 +148,12 @@ export function AddProductModal({ isOpen, onClose, onProductAdded }: AddProductM
       });
 
       setStep("form");
-    } catch {
-      // If scraping fails, allow manual entry
-      setScrapeError("Could not automatically extract product data. You can enter it manually.");
+    } catch (err) {
+      // If scraping fails, allow manual entry with specific error message if available
+      const errorMessage = err instanceof Error && err.message
+        ? err.message
+        : "Could not automatically extract product data. You can enter it manually.";
+      setScrapeError(errorMessage);
       setFormData({
         ...formData,
         sourceUrl: url.trim(),

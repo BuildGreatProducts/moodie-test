@@ -251,8 +251,18 @@ export function MoodboardCanvas({
     (type: string, data: Record<string, unknown> = {}) => {
       if (!reactFlowInstance) return;
 
-      const centerX = window.innerWidth / 2;
-      const centerY = window.innerHeight / 2;
+      // Calculate center from canvas wrapper bounds if available, otherwise fall back to window
+      let centerX: number;
+      let centerY: number;
+
+      if (reactFlowWrapper.current) {
+        const rect = reactFlowWrapper.current.getBoundingClientRect();
+        centerX = rect.left + rect.width / 2;
+        centerY = rect.top + rect.height / 2;
+      } else {
+        centerX = window.innerWidth / 2;
+        centerY = window.innerHeight / 2;
+      }
 
       const position = reactFlowInstance.screenToFlowPosition({
         x: centerX,

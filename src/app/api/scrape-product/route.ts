@@ -343,9 +343,11 @@ export async function POST(request: NextRequest) {
     // Return even partial data
     return NextResponse.json(productData);
   } catch (error) {
-    console.error("Scrape error:", error);
+    // Log the full error details server-side
+    console.error("Scrape error:", error instanceof Error ? error.stack : error);
+    // Return a generic error message to the client to avoid leaking internal details
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to scrape product" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

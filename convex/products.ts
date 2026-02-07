@@ -114,9 +114,22 @@ export const update = mutation({
     }
 
     const { id, ...updates } = args;
-    const cleanUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([, value]) => value !== undefined)
-    );
+
+    // Validate and trim name if provided
+    let cleanUpdates: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(updates)) {
+      if (value === undefined) continue;
+
+      if (key === "name") {
+        const trimmedName = (value as string).trim();
+        if (!trimmedName) {
+          throw new Error("Product name is required");
+        }
+        cleanUpdates[key] = trimmedName;
+      } else {
+        cleanUpdates[key] = value;
+      }
+    }
 
     await ctx.db.patch(id, {
       ...cleanUpdates,
