@@ -130,4 +130,49 @@ export default defineSchema({
   })
     .index("by_user_id", ["userId"])
     .index("by_moodboard_id", ["moodboardId"]),
+
+  // AI Conversations table
+  aiConversations: defineTable({
+    userId: v.id("users"),
+    moodboardId: v.id("moodboards"),
+    title: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_moodboard_id", ["moodboardId"]),
+
+  // AI Messages table
+  aiMessages: defineTable({
+    conversationId: v.id("aiConversations"),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+    content: v.string(),
+    // For AI actions that modify the canvas
+    action: v.optional(v.object({
+      type: v.string(),
+      payload: v.optional(v.string()), // JSON stringified action data
+      status: v.union(v.literal("pending"), v.literal("executed"), v.literal("rejected")),
+    })),
+    // For image generation requests
+    imageGeneration: v.optional(v.object({
+      prompt: v.string(),
+      roomType: v.optional(v.string()),
+      style: v.optional(v.string()),
+      status: v.union(v.literal("pending"), v.literal("generating"), v.literal("completed"), v.literal("failed")),
+      resultUrl: v.optional(v.string()),
+    })),
+    createdAt: v.number(),
+  })
+    .index("by_conversation_id", ["conversationId"]),
+
+  // AI Generation Usage tracking
+  aiUsage: defineTable({
+    userId: v.id("users"),
+    type: v.union(v.literal("chat"), v.literal("image_generation"), v.literal("image_edit")),
+    moodboardId: v.optional(v.id("moodboards")),
+    tokensUsed: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_user_and_type", ["userId", "type"]),
 });

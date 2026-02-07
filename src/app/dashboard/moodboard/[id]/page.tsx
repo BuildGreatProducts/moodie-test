@@ -202,6 +202,7 @@ export default function MoodboardEditorPage({ params }: PageProps) {
       {/* Canvas - no longer needs onSaveStatus since page manages it */}
       <div className="flex-1">
         <MoodboardCanvas
+          moodboardId={moodboard._id}
           initialState={initialState}
           onStateChange={handleStateChange}
         />

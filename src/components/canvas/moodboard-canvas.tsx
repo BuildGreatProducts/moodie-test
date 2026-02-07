@@ -28,6 +28,8 @@ import { ColorNode } from "./color-node";
 import { CanvasToolbar } from "./canvas-toolbar";
 import { useCanvasHistory } from "@/hooks/use-canvas-history";
 import { ProductLibraryPanel, ProductCardData } from "@/components/products";
+import { AIAssistantPanel } from "@/components/ai";
+import { Id } from "../../../convex/_generated/dataModel";
 
 // Custom node types
 const nodeTypes: NodeTypes = {
@@ -58,11 +60,13 @@ export interface CanvasState {
 }
 
 interface MoodboardCanvasProps {
+  moodboardId?: Id<"moodboards">;
   initialState?: CanvasState;
   onStateChange?: (state: CanvasState) => void;
 }
 
 export function MoodboardCanvas({
+  moodboardId,
   initialState,
   onStateChange,
 }: MoodboardCanvasProps) {
@@ -72,6 +76,7 @@ export function MoodboardCanvas({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialState?.edges || []);
   const [snapToGrid, setSnapToGrid] = useState(false);
   const [selectedNodes, setSelectedNodes] = useState<string[]>([]);
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
 
   // History for undo/redo
   const { pushState, undo, redo, canUndo, canRedo } = useCanvasHistory({
@@ -296,6 +301,55 @@ export function MoodboardCanvas({
     [addNode]
   );
 
+  // Handle AI-generated image additions
+  const handleAIAddImage = useCallback(
+    (imageUrl: string, name?: string) => {
+      addNode("image", {
+        url: imageUrl,
+        alt: name || "AI Generated Image",
+      });
+    },
+    [addNode]
+  );
+
+  // Handle AI-triggered canvas actions
+  const handleAICanvasAction = useCallback(
+    (action: { type: string; payload?: unknown }) => {
+      switch (action.type) {
+        case "add_node":
+          if (action.payload && typeof action.payload === "object") {
+            const { nodeType, data } = action.payload as { nodeType: string; data: Record<string, unknown> };
+            addNode(nodeType, data);
+          }
+          break;
+        case "remove_selected":
+          if (selectedNodes.length > 0) {
+            pushState();
+            setNodes((nds) => nds.filter((n) => !selectedNodes.includes(n.id)));
+            setEdges((eds) =>
+              eds.filter(
+                (e) => !selectedNodes.includes(e.source) && !selectedNodes.includes(e.target)
+              )
+            );
+          }
+          break;
+        case "clear_canvas":
+          pushState();
+          setNodes([]);
+          setEdges([]);
+          break;
+        default:
+          console.warn("Unknown AI canvas action:", action.type);
+      }
+    },
+    [addNode, selectedNodes, setNodes, setEdges, pushState]
+  );
+
+  // Toggle AI panel
+  const toggleAIPanel = useCallback(() => {
+    setIsAIPanelOpen((prev) => !prev);
+  }, []);
+
   return (
     <div className="flex h-full w-full">
       {/* Canvas Area */}
@@ -361,6 +415,8 @@ export function MoodboardCanvas({
               selectedNodes={selectedNodes}
               nodes={nodes}
               setNodes={setNodes}
+              onToggleAI={moodboardId ? toggleAIPanel : undefined}
+              isAIOpen={isAIPanelOpen}
             />
           </Panel>
         </ReactFlow>
@@ -370,6 +426,17 @@ export function MoodboardCanvas({
       <div className="relative">
         <ProductLibraryPanel onAddProductToCanvas={handleAddProductToCanvas} />
       </div>
+
+      {/* AI Assistant Panel */}
+      {moodboardId && (
+        <AIAssistantPanel
+          moodboardId={moodboardId}
+          isOpen={isAIPanelOpen}
+          onToggle={toggleAIPanel}
+          onAddImageToCanvas={handleAIAddImage}
+          onCanvasAction={handleAICanvasAction}
+        />
+      )}
     </div>
   );
 }

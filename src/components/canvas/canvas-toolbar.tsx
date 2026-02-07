@@ -18,6 +18,7 @@ import {
   AlignEndVertical,
   ChevronDown,
   Upload,
+  Sparkles,
 } from "lucide-react";
 
 interface CanvasToolbarProps {
@@ -31,6 +32,8 @@ interface CanvasToolbarProps {
   selectedNodes: string[];
   nodes: Node[];
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
+  onToggleAI?: () => void;
+  isAIOpen?: boolean;
 }
 
 export function CanvasToolbar({
@@ -44,6 +47,8 @@ export function CanvasToolbar({
   selectedNodes,
   nodes,
   setNodes,
+  onToggleAI,
+  isAIOpen,
 }: CanvasToolbarProps) {
   const [showAlignMenu, setShowAlignMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -276,7 +281,7 @@ export function CanvasToolbar({
       </div>
 
       {/* Grid snap toggle */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 border-r border-neutral-200 pr-2">
         <button
           onClick={onToggleSnap}
           className={snapToGrid ? activeButtonClass : toolbarButtonClass}
@@ -285,6 +290,19 @@ export function CanvasToolbar({
           <Grid3X3 className="h-5 w-5" />
         </button>
       </div>
+
+      {/* AI Assistant toggle */}
+      {onToggleAI && (
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onToggleAI}
+            className={isAIOpen ? activeButtonClass : toolbarButtonClass}
+            title={isAIOpen ? "Close AI Assistant" : "Open AI Assistant"}
+          >
+            <Sparkles className="h-5 w-5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
