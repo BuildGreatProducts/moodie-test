@@ -70,7 +70,7 @@ export function AIAssistantPanel({
   const [localMessages, setLocalMessages] = useState<Message[]>([]);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [conversationId, setConversationId] = useState<Id<"aiConversations"> | null>(null);
-  const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const isCreatingConversationRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -93,24 +93,41 @@ export function AIAssistantPanel({
 
   // Helper to ensure conversation exists before operations
   const ensureConversation = useCallback(async (): Promise<Id<"aiConversations"> | null> => {
+    // Check conversationId first (fast path)
     if (conversationId) return conversationId;
-    if (isCreatingConversation) return null;
 
-    setIsCreatingConversation(true);
+    // Use ref for synchronous check to prevent race conditions
+    if (isCreatingConversationRef.current) return null;
+
+    // Set ref synchronously before any async work
+    isCreatingConversationRef.current = true;
+
     try {
       const newConversation = await createConversation({ moodboardId });
       if (newConversation?._id) {
-        setConversationId(newConversation._id);
-        return newConversation._id;
+        // Re-check if conversationId was set by a concurrent caller or existingConversation query
+        // Use functional update to get latest state
+        let resultId: Id<"aiConversations"> | null = null;
+        setConversationId((current: Id<"aiConversations"> | null) => {
+          if (current) {
+            // Another caller already set the ID, use that one
+            resultId = current;
+            return current;
+          }
+          // Set the new ID
+          resultId = newConversation._id;
+          return newConversation._id;
+        });
+        return resultId;
       }
       return null;
     } catch (error) {
       console.error("Failed to create conversation:", error);
       return null;
     } finally {
-      setIsCreatingConversation(false);
+      isCreatingConversationRef.current = false;
     }
-  }, [conversationId, isCreatingConversation, createConversation, moodboardId]);
+  }, [conversationId, createConversation, moodboardId]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -188,6 +205,11 @@ export function AIAssistantPanel({
     }
   };
 
+  // Helper to check if a message ID is a synthetic/temporary ID
+  const isSyntheticMessageId = (messageId: string): boolean => {
+    return messageId.startsWith("temp-");
+  };
+
   const handleAcceptAction = useCallback(
     async (messageId: string, action: NonNullable<Message["action"]>) => {
       if (!action.type || !onCanvasAction) return;
@@ -203,15 +225,24 @@ export function AIAssistantPanel({
         }
       }
 
-      // Execute canvas action and update status
+      // Execute canvas action
       try {
         onCanvasAction({ type: action.type, payload });
-        await updateActionStatus({
-          messageId: messageId as Id<"aiMessages">,
-          status: "executed",
-        });
       } catch (actionError) {
-        console.error("Failed to execute canvas action or update status:", actionError);
+        console.error("Failed to execute canvas action:", actionError);
+        return;
+      }
+
+      // Only update status for server-sourced messages (not synthetic/temporary IDs)
+      if (!isSyntheticMessageId(messageId)) {
+        try {
+          await updateActionStatus({
+            messageId: messageId as Id<"aiMessages">,
+            status: "executed",
+          });
+        } catch (statusError) {
+          console.error("Failed to update action status:", statusError);
+        }
       }
     },
     [onCanvasAction, updateActionStatus]
@@ -219,6 +250,11 @@ export function AIAssistantPanel({
 
   const handleDismissAction = useCallback(
     async (messageId: string) => {
+      // Only update status for server-sourced messages (not synthetic/temporary IDs)
+      if (isSyntheticMessageId(messageId)) {
+        return;
+      }
+
       try {
         await updateActionStatus({
           messageId: messageId as Id<"aiMessages">,
@@ -243,13 +279,13 @@ export function AIAssistantPanel({
   // Combine server messages with local optimistic messages
   const allMessages = [...(messages || []), ...localMessages];
 
-  const renderMessage = (msg: Message) => {
+  const renderMessage = (msg: Message, idx: number) => {
     const isUser = msg.role === "user";
     const isAssistant = msg.role === "assistant";
 
     return (
       <div
-        key={msg.id || msg.createdAt}
+        key={`${msg.id ?? msg.createdAt}-${idx}`}
         className={`flex ${isUser ? "justify-end" : "justify-start"} mb-3`}
       >
         <div
@@ -399,7 +435,7 @@ export function AIAssistantPanel({
             </div>
           ) : (
             <>
-              {allMessages.map((msg) =>
+              {allMessages.map((msg, idx) =>
                 renderMessage({
                   id: msg._id || msg.id,
                   role: msg.role,
@@ -407,7 +443,7 @@ export function AIAssistantPanel({
                   createdAt: msg.createdAt,
                   action: msg.action,
                   imageGeneration: msg.imageGeneration,
-                } as Message)
+                } as Message, idx)
               )}
               {isLoading && (
                 <div className="flex justify-start mb-3">
