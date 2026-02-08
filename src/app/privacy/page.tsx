@@ -262,7 +262,7 @@ export default function PrivacyPolicyPage() {
                 management
               </li>
               <li>
-                <strong>Payments:</strong> Stripe for payment processing
+                <strong>Payments:</strong> Polar for payment processing
               </li>
               <li>
                 <strong>Analytics:</strong> Privacy-focused analytics to understand usage

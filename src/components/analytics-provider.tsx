@@ -26,15 +26,17 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
     trackPageView(url);
   }, [pathname, searchParams]);
 
-  // Identify user when signed in
+  // Identify user when signed in (avoid PII like raw email)
   useEffect(() => {
-    if (isSignedIn && user) {
+    // Only identify when explicitly signed in (not undefined/loading)
+    if (isSignedIn === true && user) {
       identifyUser(user.id, {
-        email: user.primaryEmailAddress?.emailAddress,
+        // Avoid sending PII - only send non-sensitive traits
         name: user.fullName || undefined,
         createdAt: user.createdAt?.toISOString(),
       });
-    } else if (!isSignedIn) {
+    } else if (isSignedIn === false) {
+      // Only reset when explicitly signed out (not during loading)
       resetAnalytics();
     }
   }, [isSignedIn, user]);

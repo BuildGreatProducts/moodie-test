@@ -97,10 +97,10 @@ export function EmptyProjects({ onCreateProject }: { onCreateProject?: () => voi
       icon={<FolderOpen className="h-8 w-8 text-neutral-400" />}
       title="No projects yet"
       description="Create your first project to start organizing your interior design work. Projects help you group related moodboards together."
-      action={{
+      action={onCreateProject ? {
         label: "Create Project",
         onClick: onCreateProject,
-      }}
+      } : undefined}
     />
   );
 }
@@ -111,10 +111,10 @@ export function EmptyMoodboards({ onCreateMoodboard }: { onCreateMoodboard?: () 
       icon={<Palette className="h-8 w-8 text-neutral-400" />}
       title="No moodboards yet"
       description="Create your first moodboard to start visualizing your design ideas. Add images, products, and notes to bring your vision to life."
-      action={{
+      action={onCreateMoodboard ? {
         label: "Create Moodboard",
         onClick: onCreateMoodboard,
-      }}
+      } : undefined}
     />
   );
 }
@@ -125,10 +125,10 @@ export function EmptyProducts({ onAddProduct }: { onAddProduct?: () => void }) {
       icon={<Package className="h-8 w-8 text-neutral-400" />}
       title="No products yet"
       description="Start building your product library by adding furniture, decor, and other items you love. Add products via URL or upload images."
-      action={{
+      action={onAddProduct ? {
         label: "Add Product",
         onClick: onAddProduct,
-      }}
+      } : undefined}
     />
   );
 }
@@ -161,6 +161,8 @@ export function EmptyCanvas({ onUploadImage, onGenerateImage }: {
   onUploadImage?: () => void;
   onGenerateImage?: () => void;
 }) {
+  const hasAnyAction = onUploadImage || onGenerateImage;
+
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
       <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-primary-100 to-secondary-100 mb-6">
@@ -172,22 +174,30 @@ export function EmptyCanvas({ onUploadImage, onGenerateImage }: {
       <p className="text-neutral-600 max-w-md mb-8">
         Start by uploading an inspiration image or let AI generate a room design for you.
       </p>
-      <div className="flex flex-col sm:flex-row items-center gap-4">
-        <button
-          onClick={onUploadImage}
-          className="flex items-center gap-2 px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
-        >
-          <ImagePlus className="h-5 w-5" />
-          Upload Image
-        </button>
-        <button
-          onClick={onGenerateImage}
-          className="flex items-center gap-2 px-5 py-3 border-2 border-primary-200 text-primary-700 rounded-xl hover:bg-primary-50 transition-colors font-medium"
-        >
-          <Sparkles className="h-5 w-5" />
-          Generate with AI
-        </button>
-      </div>
+      {hasAnyAction && (
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+          {onUploadImage && (
+            <button
+              onClick={onUploadImage}
+              aria-label="Upload an image"
+              className="flex items-center gap-2 px-5 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
+            >
+              <ImagePlus className="h-5 w-5" />
+              Upload Image
+            </button>
+          )}
+          {onGenerateImage && (
+            <button
+              onClick={onGenerateImage}
+              aria-label="Generate image with AI"
+              className="flex items-center gap-2 px-5 py-3 border-2 border-primary-200 text-primary-700 rounded-xl hover:bg-primary-50 transition-colors font-medium"
+            >
+              <Sparkles className="h-5 w-5" />
+              Generate with AI
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

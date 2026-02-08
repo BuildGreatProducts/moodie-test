@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 
 // Get user by Clerk ID (authenticated, can only fetch own record)
 export const getByClerkId = query({
@@ -39,8 +39,8 @@ export const getCurrentUser = query({
   },
 });
 
-// Create or update user (called from Clerk webhook or sync)
-export const upsertUser = mutation({
+// Create or update user (called from Clerk webhook - internal only)
+export const upsertUser = internalMutation({
   args: {
     clerkId: v.string(),
     email: v.string(),

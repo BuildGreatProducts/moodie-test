@@ -3,29 +3,9 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { Authenticated, Unauthenticated, AuthLoading } from "convex/react";
-import { useUser } from "@clerk/nextjs";
-import { useMutation } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 
-function UserSync() {
-  const { user } = useUser();
-  const upsertUser = useMutation(api.users.upsertUser);
-
-  useEffect(() => {
-    // Only sync user if we have a valid email address
-    const email = user?.primaryEmailAddress?.emailAddress;
-    if (user && email) {
-      upsertUser({
-        clerkId: user.id,
-        email,
-        name: user.fullName ?? undefined,
-        imageUrl: user.imageUrl,
-      });
-    }
-  }, [user, upsertUser]);
-
-  return null;
-}
+// Note: User sync is handled by the Clerk webhook (internal mutation)
+// No client-side upsertUser is needed
 
 function LoadingScreen() {
   return (
@@ -59,7 +39,6 @@ export function DashboardLayoutClient({ children }: { children: ReactNode }) {
         <LoadingScreen />
       </Unauthenticated>
       <Authenticated>
-        <UserSync />
         <AppShell>{children}</AppShell>
       </Authenticated>
     </>

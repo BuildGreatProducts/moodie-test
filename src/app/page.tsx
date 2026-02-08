@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
 import {
   Sparkles,
   Palette,
@@ -16,6 +13,7 @@ import {
   Wand2,
   Layout,
 } from "lucide-react";
+import { NavAuthButtons } from "@/components/nav-auth-buttons";
 
 const FEATURES = [
   {
@@ -99,8 +97,6 @@ const PRICING_FEATURES = {
 };
 
 export default function LandingPage() {
-  const { isSignedIn } = useUser();
-
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation */}
@@ -125,31 +121,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <div className="flex items-center gap-4">
-              {isSignedIn ? (
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
-                >
-                  Go to Dashboard
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              ) : (
-                <>
-                  <Link
-                    href="/sign-in"
-                    className="hidden sm:block text-neutral-600 hover:text-neutral-900 transition-colors"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    href="/sign-up"
-                    className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
-                  >
-                    Get Started Free
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </>
-              )}
+              <NavAuthButtons />
             </div>
           </div>
         </div>
@@ -364,7 +336,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link
-                href="/sign-up"
+                href="/sign-up?plan=free"
                 className="block text-center w-full py-3 border-2 border-neutral-200 rounded-xl hover:bg-neutral-50 transition-colors font-medium text-neutral-700"
               >
                 Get Started
@@ -393,7 +365,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link
-                href="/sign-up"
+                href="/sign-up?plan=pro"
                 className="block text-center w-full py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
               >
                 Start Free Trial

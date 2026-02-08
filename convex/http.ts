@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { Webhook } from "svix";
 
 const http = httpRouter();
@@ -71,7 +71,7 @@ http.route({
         (e) => e.id === body.data.primary_email_address_id
       );
 
-      await ctx.runMutation(api.users.upsertUser, {
+      await ctx.runMutation(internal.users.upsertUser, {
         clerkId: id,
         email: primaryEmail?.email_address ?? "",
         name: [first_name, last_name].filter(Boolean).join(" ") || undefined,
@@ -116,7 +116,9 @@ function mapPolarStatus(
     case "trial":
       return "trialing";
     default:
-      return "active";
+      // Unknown status should be treated as canceled to avoid granting access
+      console.warn(`Unknown Polar status received: "${polarStatus}", treating as canceled`);
+      return "canceled";
   }
 }
 
@@ -130,9 +132,11 @@ async function verifyPolarSignature(
 
   try {
     const encoder = new TextEncoder();
+    // Base64-decode the secret before using it as the key
+    const secretBytes = Uint8Array.from(atob(secret), (c) => c.charCodeAt(0));
     const key = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(secret),
+      secretBytes,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["verify"]
@@ -159,12 +163,14 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const webhookSecret = process.env.POLAR_WEBHOOK_SECRET;
+    const environment = process.env.ENVIRONMENT;
 
     // Get the raw body for verification
     const rawBody = await request.text();
-    const signature = request.headers.get("polar-signature");
+    // Use the standard Polar webhook header
+    const signature = request.headers.get("webhook-signature");
 
-    // Verify signature in production
+    // Verify signature when secret is configured
     if (webhookSecret) {
       const isValid = await verifyPolarSignature(
         rawBody,
@@ -178,7 +184,8 @@ http.route({
           headers: { "Content-Type": "application/json" },
         });
       }
-    } else if (process.env.NODE_ENV !== "development") {
+    } else if (environment !== "development") {
+      // Only allow missing secret in development environment
       console.error("POLAR_WEBHOOK_SECRET not configured");
       return new Response(
         JSON.stringify({ error: "Webhook secret not configured" }),
@@ -186,9 +193,19 @@ http.route({
       );
     }
 
-    // Parse and process the event
-    const event = JSON.parse(rawBody);
-    const eventType = event.type || event.event_type;
+    // Parse and process the event - inside try/catch for malformed JSON
+    let event: Record<string, unknown>;
+    try {
+      event = JSON.parse(rawBody);
+    } catch (parseError) {
+      console.error("Failed to parse webhook payload:", parseError);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON payload" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const eventType = (event.type || event.event_type) as string | undefined;
 
     console.log("Received Polar webhook:", eventType);
 

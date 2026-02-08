@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -14,6 +14,7 @@ import {
   Building2,
   User,
   Lightbulb,
+  Loader2,
 } from "lucide-react";
 
 const PROJECT_TYPES = [
@@ -39,9 +40,27 @@ export default function OnboardingPage() {
   const user = useQuery(api.users.getCurrentUser);
   const updateProfile = useMutation(api.users.updateProfile);
 
-  // Redirect if already completed onboarding
+  // Redirect if already completed onboarding - in useEffect to avoid side effects during render
+  useEffect(() => {
+    if (user?.onboardingCompleted) {
+      router.push("/dashboard");
+    }
+  }, [user, router]);
+
+  // Show loading state while user data is loading
+  if (user === undefined) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
+          <p className="text-neutral-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render form if user has already completed onboarding (redirect is happening)
   if (user?.onboardingCompleted) {
-    router.push("/dashboard");
     return null;
   }
 
@@ -144,6 +163,7 @@ export default function OnboardingPage() {
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 placeholder="e.g., Studio Moodie Design"
+                aria-label="Business or studio name"
                 className="w-full px-4 py-3 rounded-xl border border-neutral-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 outline-none text-center text-lg"
               />
               <p className="text-sm text-neutral-400 mt-3">
