@@ -366,9 +366,12 @@ export const generateImage = mutation({
       "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800&q=80",
     ];
 
-    // Select a random placeholder image
-    const imageUrl =
-      placeholderImages[Math.floor(Math.random() * placeholderImages.length)];
+    // Select placeholder image deterministically based on prompt hash
+    // (Convex mutations must be deterministic for replay safety)
+    const promptHash = trimmedPrompt
+      .split("")
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const imageUrl = placeholderImages[promptHash % placeholderImages.length];
 
     // If there's a conversation, add the generation as a message (ownership already verified)
     if (args.conversationId) {
