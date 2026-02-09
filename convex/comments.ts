@@ -190,11 +190,14 @@ export const create = mutation({
       }
     }
 
-    // If parentId is provided, verify it exists
+    // If parentId is provided, verify it exists and belongs to the same moodboard
     if (args.parentId) {
       const parentComment = await ctx.db.get(args.parentId);
       if (!parentComment) {
         throw new Error("Parent comment not found");
+      }
+      if (parentComment.moodboardId !== args.moodboardId) {
+        throw new Error("Parent comment does not belong to this moodboard");
       }
     }
 
