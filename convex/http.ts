@@ -271,7 +271,9 @@ http.route({
             );
           }
           const plan = planName || "free";
-          const status = subscription.status || "active";
+          // Pass status to mapPolarStatus to handle unknown/missing values safely
+          // (mapPolarStatus treats unknown values as "canceled" to avoid granting access)
+          const status = subscription.status || "";
           const periodStart = subscription.current_period_start
             ? new Date(subscription.current_period_start).getTime()
             : Date.now();
