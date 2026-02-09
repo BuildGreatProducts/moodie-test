@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
-import { getAuthenticatedUser } from "./auth-helpers";
+import { getAuthenticatedUser, authorizeMoodboardAccess } from "./auth-helpers";
 
 // Get existing conversation for a moodboard (read-only)
 export const getConversation = query({
@@ -327,7 +327,8 @@ export const generateImage = mutation({
     style: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx);
+    // Verify user owns the moodboard before tracking usage against it
+    await authorizeMoodboardAccess(ctx, args.moodboardId);
 
     // Validate prompt
     const trimmedPrompt = args.prompt.trim();
