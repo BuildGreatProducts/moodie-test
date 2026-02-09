@@ -29,8 +29,13 @@ async function canAccessComments(
     }
   }
 
-  // If sharing is enabled, allow access (for clients viewing shared moodboards)
+  // If sharing is enabled and not expired, allow access (for clients viewing shared moodboards)
   if (moodboard.shareEnabled) {
+    // Check if share link has expired
+    const expiresAt = moodboard.shareExpiresAt as number | undefined;
+    if (expiresAt && expiresAt < Date.now()) {
+      return false;
+    }
     return true;
   }
 
@@ -173,9 +178,16 @@ export const create = mutation({
       }
     }
 
-    // Allow comments if: user owns the moodboard OR sharing is enabled
-    if (!isOwner && !moodboard.shareEnabled) {
-      throw new Error("Comments are not allowed on this moodboard");
+    // Allow comments if: user owns the moodboard OR sharing is enabled and not expired
+    if (!isOwner) {
+      if (!moodboard.shareEnabled) {
+        throw new Error("Comments are not allowed on this moodboard");
+      }
+      // Check if share link has expired
+      const expiresAt = moodboard.shareExpiresAt as number | undefined;
+      if (expiresAt && expiresAt < Date.now()) {
+        throw new Error("This share link has expired");
+      }
     }
 
     // If parentId is provided, verify it exists
