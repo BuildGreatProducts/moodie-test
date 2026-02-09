@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
+import { useToast } from "@/hooks/use-toast";
 import {
   ArrowRight,
   ArrowLeft,
@@ -29,7 +30,33 @@ const EXPERIENCE_LEVELS = [
   { id: "experienced", label: "Established designer", description: "5+ years" },
 ];
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
+        <p className="text-neutral-600">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
 export default function OnboardingPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Show loading state during SSR/prerendering to avoid Convex hooks running without provider
+  if (!mounted) {
+    return <LoadingScreen />;
+  }
+
+  return <OnboardingForm />;
+}
+
+function OnboardingForm() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [businessName, setBusinessName] = useState("");
@@ -39,6 +66,7 @@ export default function OnboardingPage() {
 
   const user = useQuery(api.users.getCurrentUser);
   const updateProfile = useMutation(api.users.updateProfile);
+  const { toast } = useToast();
 
   // Redirect if already completed onboarding - in useEffect to avoid side effects during render
   useEffect(() => {
@@ -49,14 +77,7 @@ export default function OnboardingPage() {
 
   // Show loading state while user data is loading
   if (user === undefined) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-secondary-50">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
-          <p className="text-neutral-600">Loading...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   // Don't render form if user has already completed onboarding (redirect is happening)
@@ -88,6 +109,11 @@ export default function OnboardingPage() {
       router.push("/dashboard");
     } catch (error) {
       console.error("Failed to complete onboarding:", error);
+      toast({
+        title: "Something went wrong",
+        description: error instanceof Error ? error.message : "Failed to complete onboarding. Please try again.",
+        variant: "destructive",
+      });
       setIsSubmitting(false);
     }
   };
@@ -101,6 +127,11 @@ export default function OnboardingPage() {
       router.push("/dashboard");
     } catch (error) {
       console.error("Failed to skip onboarding:", error);
+      toast({
+        title: "Something went wrong",
+        description: error instanceof Error ? error.message : "Failed to skip onboarding. Please try again.",
+        variant: "destructive",
+      });
       setIsSubmitting(false);
     }
   };

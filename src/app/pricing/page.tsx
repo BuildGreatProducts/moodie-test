@@ -1,9 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useUser } from "@clerk/nextjs";
-import { useQuery } from "convex/react";
-import { api } from "../../../convex/_generated/api";
 import Link from "next/link";
 import {
   Check,
@@ -14,6 +11,7 @@ import {
   Building2,
   ChevronDown,
 } from "lucide-react";
+import { PricingHeaderAuthButtons, PricingPlanButton } from "@/components/pricing-auth-buttons";
 
 const PLANS = [
   {
@@ -107,40 +105,8 @@ const FAQS = [
 ];
 
 export default function PricingPage() {
-  const { isSignedIn } = useUser();
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
-
-  const subscription = useQuery(
-    api.subscriptions.getSubscription,
-    isSignedIn ? {} : "skip"
-  );
-
-  const currentPlan = subscription?.plan || "free";
-
-  const handleSelectPlan = (planId: string) => {
-    if (!isSignedIn) {
-      // Redirect to sign up
-      window.location.href = "/sign-up";
-      return;
-    }
-
-    if (planId === "team") {
-      // For team plan, contact sales
-      window.location.href = "mailto:sales@moodie.app?subject=Team Plan Inquiry";
-      return;
-    }
-
-    if (planId === currentPlan) {
-      // Already on this plan
-      return;
-    }
-
-    // For now, redirect to a checkout URL
-    // In production, this would integrate with Polar.sh
-    const checkoutUrl = `/api/checkout?plan=${planId}&billing=${billingCycle}`;
-    window.location.href = checkoutUrl;
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white">
@@ -157,29 +123,7 @@ export default function PricingPage() {
               </span>
             </Link>
             <div className="flex items-center gap-4">
-              {isSignedIn ? (
-                <Link
-                  href="/dashboard"
-                  className="rounded-lg bg-primary-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600"
-                >
-                  Dashboard
-                </Link>
-              ) : (
-                <>
-                  <Link
-                    href="/sign-in"
-                    className="text-sm font-medium text-neutral-600 hover:text-neutral-900"
-                  >
-                    Sign in
-                  </Link>
-                  <Link
-                    href="/sign-up"
-                    className="rounded-lg bg-primary-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-600"
-                  >
-                    Get Started
-                  </Link>
-                </>
-              )}
+              <PricingHeaderAuthButtons />
             </div>
           </div>
         </div>
@@ -227,7 +171,6 @@ export default function PricingPage() {
         <div className="grid gap-8 lg:grid-cols-3">
           {PLANS.map((plan) => {
             const price = billingCycle === "annual" ? plan.priceAnnual : plan.price;
-            const isCurrentPlan = currentPlan === plan.id;
 
             return (
               <div
@@ -274,20 +217,12 @@ export default function PricingPage() {
                   )}
                 </div>
 
-                <button
-                  onClick={() => handleSelectPlan(plan.id)}
-                  disabled={isCurrentPlan}
-                  className={`mb-8 w-full rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
-                    isCurrentPlan
-                      ? "cursor-not-allowed bg-neutral-100 text-neutral-500"
-                      : plan.popular
-                      ? "bg-primary-500 text-white hover:bg-primary-600"
-                      : "bg-neutral-900 text-white hover:bg-neutral-800"
-                  }`}
-                >
-                  {isCurrentPlan ? "Current Plan" : plan.cta}
-                  {!isCurrentPlan && <ArrowRight className="ml-2 inline h-4 w-4" />}
-                </button>
+                <PricingPlanButton
+                  planId={plan.id}
+                  cta={plan.cta}
+                  popular={plan.popular}
+                  billingCycle={billingCycle}
+                />
 
                 <ul className="space-y-3">
                   {plan.features.map((feature, idx) => (

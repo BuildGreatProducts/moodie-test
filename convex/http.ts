@@ -122,16 +122,24 @@ function mapPolarStatus(
   }
 }
 
-// Verify Polar webhook signature using HMAC-SHA256
+// Verify Polar/Standard Webhooks signature
+// See: https://www.standardwebhooks.com/
 async function verifyPolarSignature(
-  payload: string,
-  signature: string | null,
+  rawBody: string,
+  webhookId: string | null,
+  webhookTimestamp: string | null,
+  webhookSignature: string | null,
   secret: string
 ): Promise<boolean> {
-  if (!signature) return false;
+  if (!webhookId || !webhookTimestamp || !webhookSignature) {
+    return false;
+  }
 
   try {
+    // Build the signed payload as per Standard Webhooks spec
+    const signedPayload = `${webhookId}.${webhookTimestamp}.${rawBody}`;
     const encoder = new TextEncoder();
+
     // Base64-decode the secret before using it as the key
     const secretBytes = Uint8Array.from(atob(secret), (c) => c.charCodeAt(0));
     const key = await crypto.subtle.importKey(
@@ -142,16 +150,35 @@ async function verifyPolarSignature(
       ["verify"]
     );
 
-    const signatureBuffer = Uint8Array.from(atob(signature), (c) =>
-      c.charCodeAt(0)
-    );
+    // Parse signature(s) - format may be "v1,signature1 v1,signature2" or just "v1,signature"
+    const signatures = webhookSignature.split(" ");
 
-    return await crypto.subtle.verify(
-      "HMAC",
-      key,
-      signatureBuffer,
-      encoder.encode(payload)
-    );
+    for (const sig of signatures) {
+      // Strip "v1," prefix if present
+      const signatureValue = sig.startsWith("v1,") ? sig.slice(3) : sig;
+
+      try {
+        const signatureBuffer = Uint8Array.from(atob(signatureValue), (c) =>
+          c.charCodeAt(0)
+        );
+
+        const isValid = await crypto.subtle.verify(
+          "HMAC",
+          key,
+          signatureBuffer,
+          encoder.encode(signedPayload)
+        );
+
+        if (isValid) {
+          return true;
+        }
+      } catch {
+        // Try next signature
+        continue;
+      }
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -167,14 +194,19 @@ http.route({
 
     // Get the raw body for verification
     const rawBody = await request.text();
-    // Use the standard Polar webhook header
-    const signature = request.headers.get("webhook-signature");
+
+    // Get Standard Webhooks headers
+    const webhookId = request.headers.get("webhook-id");
+    const webhookTimestamp = request.headers.get("webhook-timestamp");
+    const webhookSignature = request.headers.get("webhook-signature");
 
     // Verify signature when secret is configured
     if (webhookSecret) {
       const isValid = await verifyPolarSignature(
         rawBody,
-        signature,
+        webhookId,
+        webhookTimestamp,
+        webhookSignature,
         webhookSecret
       );
       if (!isValid) {
@@ -250,8 +282,9 @@ http.route({
             cancelAtPeriodEnd,
           });
 
+          // Log without PII - use subscription ID instead of email
           console.log(
-            `Subscription ${eventType} processed for ${customerEmail}`
+            `Subscription ${eventType} processed for subscription: ${subscriptionId}`
           );
           break;
         }
@@ -317,12 +350,20 @@ http.route({
   }),
 });
 
-// Handle OPTIONS requests for Polar webhook
+// Handle OPTIONS preflight requests for Polar webhook with CORS headers
 http.route({
   path: "/polar-webhook",
   method: "OPTIONS",
   handler: httpAction(async () => {
-    return new Response(null, { status: 200 });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, webhook-id, webhook-timestamp, webhook-signature",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
   }),
 });
 
