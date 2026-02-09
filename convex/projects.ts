@@ -1,46 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
+import { getAuthenticatedUser, authorizeProjectAccess } from "./auth-helpers";
 import { enforceSubscriptionLimit } from "./subscriptions";
-
-// Helper: Get authenticated user or throw
-async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
-  const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
-    throw new Error("Not authenticated");
-  }
-
-  const user = await ctx.db
-    .query("users")
-    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-    .first();
-
-  if (!user) {
-    throw new Error("User not found");
-  }
-
-  return user;
-}
-
-// Helper: Authorize project access - verifies ownership
-async function authorizeProjectAccess(
-  ctx: QueryCtx | MutationCtx,
-  projectId: Id<"projects">
-) {
-  const user = await getAuthenticatedUser(ctx);
-
-  const project = await ctx.db.get(projectId);
-  if (!project) {
-    throw new Error("Project not found");
-  }
-
-  // Verify the user owns this project
-  if (project.userId !== user._id) {
-    throw new Error("Not authorized to access this project");
-  }
-
-  return { user, project };
-}
 
 // Get all projects for the current user
 export const list = query({
