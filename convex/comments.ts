@@ -156,9 +156,10 @@ export const create = mutation({
       throw new Error("Moodboard not found");
     }
 
-    // Check if user is authenticated (designer)
+    // Check authorization: user must own moodboard OR sharing must be enabled
     const identity = await ctx.auth.getUserIdentity();
     let authorUserId = null;
+    let isOwner = false;
 
     if (identity) {
       const user = await ctx.db
@@ -168,12 +169,13 @@ export const create = mutation({
 
       if (user) {
         authorUserId = user._id;
+        isOwner = moodboard.userId === user._id;
       }
-    } else {
-      // For anonymous clients, verify sharing is enabled
-      if (!moodboard.shareEnabled) {
-        throw new Error("Comments are not allowed on this moodboard");
-      }
+    }
+
+    // Allow comments if: user owns the moodboard OR sharing is enabled
+    if (!isOwner && !moodboard.shareEnabled) {
+      throw new Error("Comments are not allowed on this moodboard");
     }
 
     // If parentId is provided, verify it exists
