@@ -254,8 +254,19 @@ export const generateShareLink = mutation({
   handler: async (ctx, args) => {
     await authorizeMoodboardAccess(ctx, args.id);
 
-    // Generate a unique share ID
-    const shareId = crypto.randomUUID();
+    // Generate a deterministic share ID from moodboard ID + timestamp
+    // (Convex mutations must be deterministic for replay safety)
+    const timestamp = Date.now();
+    const input = `${args.id}-${timestamp}`;
+    // Simple hash to create a UUID-like string
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i);
+      hash = ((hash << 5) - hash + char) | 0;
+    }
+    const hashHex = Math.abs(hash).toString(16).padStart(8, "0");
+    const timestampHex = timestamp.toString(16);
+    const shareId = `${hashHex}-${timestampHex.slice(0, 4)}-${timestampHex.slice(4, 8)}-${timestampHex.slice(8)}`;
 
     const updateData: {
       shareId: string;
