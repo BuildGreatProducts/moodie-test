@@ -238,7 +238,10 @@ export const listMyProducts = query({
     }
 
     const paginatedProducts = filteredProducts.slice(startIndex, startIndex + limit);
-    const nextCursor = paginatedProducts.length === limit ? paginatedProducts[limit - 1]._id : null;
+    // Check limit > 0 to avoid array index -1 when limit is 0
+    const nextCursor = limit > 0 && paginatedProducts.length === limit
+      ? paginatedProducts[paginatedProducts.length - 1]._id
+      : null;
 
     return {
       products: paginatedProducts,
@@ -383,7 +386,10 @@ export const browse = query({
     }
 
     const paginatedProducts = filteredProducts.slice(startIndex, startIndex + limit);
-    const nextCursor = paginatedProducts.length === limit ? paginatedProducts[limit - 1]._id : null;
+    // Check limit > 0 to avoid array index -1 when limit is 0
+    const nextCursor = limit > 0 && paginatedProducts.length === limit
+      ? paginatedProducts[paginatedProducts.length - 1]._id
+      : null;
 
     return {
       products: paginatedProducts,
