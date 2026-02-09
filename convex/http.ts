@@ -289,6 +289,22 @@ http.route({
             );
           }
 
+          if (!subscriptionId) {
+            console.error("No subscription ID in subscription event");
+            return new Response(
+              JSON.stringify({ error: "Missing subscription ID" }),
+              { status: 400, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
+          if (!customerId) {
+            console.error("No customer ID in subscription event");
+            return new Response(
+              JSON.stringify({ error: "Missing customer ID" }),
+              { status: 400, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
           await ctx.runMutation(internal.subscriptions.upsertSubscription, {
             polarSubscriptionId: subscriptionId,
             polarCustomerId: customerId,
@@ -312,6 +328,14 @@ http.route({
           const subscription = event.data || event;
           const subscriptionId = subscription.id || subscription.subscription_id;
 
+          if (!subscriptionId) {
+            console.error("No subscription ID in canceled event");
+            return new Response(
+              JSON.stringify({ error: "Missing subscription ID" }),
+              { status: 400, headers: { "Content-Type": "application/json" } }
+            );
+          }
+
           await ctx.runMutation(
             internal.subscriptions.handleSubscriptionStatusChange,
             {
@@ -332,6 +356,14 @@ http.route({
           const subscription = event.data || event;
           const subscriptionId =
             subscription.subscription_id || subscription.id;
+
+          if (!subscriptionId) {
+            console.error("No subscription ID in payment failed event");
+            return new Response(
+              JSON.stringify({ error: "Missing subscription ID" }),
+              { status: 400, headers: { "Content-Type": "application/json" } }
+            );
+          }
 
           await ctx.runMutation(
             internal.subscriptions.handleSubscriptionStatusChange,
