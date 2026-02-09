@@ -328,7 +328,7 @@ export const generateImage = mutation({
   },
   handler: async (ctx, args) => {
     // Verify user owns the moodboard before tracking usage against it
-    await authorizeMoodboardAccess(ctx, args.moodboardId);
+    const { user } = await authorizeMoodboardAccess(ctx, args.moodboardId);
 
     // Validate prompt
     const trimmedPrompt = args.prompt.trim();
