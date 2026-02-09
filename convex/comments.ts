@@ -295,20 +295,24 @@ export const remove = mutation({
       throw new Error("Not authorized to delete this comment");
     }
 
-    // Delete all replies to this comment
-    const replies = await ctx.db
-      .query("comments")
-      .withIndex("by_parent_id", (q) => q.eq("parentId", args.id))
-      .collect();
+    // Recursively delete all nested replies (children, grandchildren, etc.)
+    async function deleteCommentAndReplies(commentId: typeof args.id) {
+      const replies = await ctx.db
+        .query("comments")
+        .withIndex("by_parent_id", (q) => q.eq("parentId", commentId))
+        .collect();
 
-    for (const reply of replies) {
+      // Recursively delete all nested replies first
+      for (const reply of replies) {
+        await deleteCommentAndReplies(reply._id);
+      }
+
+      // Then delete this comment
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (ctx.db as any).delete(reply._id);
+      await (ctx.db as any).delete(commentId);
     }
 
-    // Delete the comment
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (ctx.db as any).delete(args.id);
+    await deleteCommentAndReplies(args.id);
 
     return args.id;
   },
