@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, internalMutation } from "./_generated/server";
 import { getAuthenticatedUser, authorizeMoodboardAccess } from "./auth-helpers";
+import { enforceSubscriptionLimit } from "./subscriptions";
 
 // Get existing conversation for a moodboard (read-only)
 export const getConversation = query({
@@ -329,6 +330,9 @@ export const generateImage = mutation({
   handler: async (ctx, args) => {
     // Verify user owns the moodboard before tracking usage against it
     const { user } = await authorizeMoodboardAccess(ctx, args.moodboardId);
+
+    // Enforce subscription limits
+    await enforceSubscriptionLimit(ctx, user._id, "generate_ai_image");
 
     // Validate prompt
     const trimmedPrompt = args.prompt.trim();

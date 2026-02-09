@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { enforceSubscriptionLimit } from "./subscriptions";
 
 // Helper: Get authenticated user or throw
 async function getAuthenticatedUser(ctx: QueryCtx | MutationCtx) {
@@ -123,6 +124,9 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx);
+
+    // Enforce subscription limits
+    await enforceSubscriptionLimit(ctx, user._id, "create_project");
 
     const now = Date.now();
 

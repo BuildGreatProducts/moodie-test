@@ -1,6 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, MutationCtx } from "./_generated/server";
 import { getAuthenticatedUser } from "./auth-helpers";
+import { Id } from "./_generated/dataModel";
 
 // Plan limits
 export const PLAN_LIMITS = {
@@ -23,6 +24,85 @@ export const PLAN_LIMITS = {
     productsPerMonth: -1,
   },
 };
+
+export type ActionType = "create_project" | "create_moodboard" | "generate_ai_image" | "add_product";
+
+// Enforce subscription limits - throws error if limit exceeded
+// Call this from mutations before performing the action
+export async function enforceSubscriptionLimit(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  action: ActionType
+): Promise<void> {
+  const subscription = await ctx.db
+    .query("subscriptions")
+    .withIndex("by_user_id", (q) => q.eq("userId", userId))
+    .first();
+
+  const plan = (subscription?.plan || "free") as keyof typeof PLAN_LIMITS;
+  const limits = PLAN_LIMITS[plan];
+  const periodStart = (subscription?.currentPeriodStart as number | undefined) || Date.now() - 30 * 24 * 60 * 60 * 1000;
+
+  switch (action) {
+    case "create_project": {
+      if (limits.projects === -1) return;
+      const projects = await ctx.db
+        .query("projects")
+        .withIndex("by_user_id", (q) => q.eq("userId", userId))
+        .collect();
+      const activeCount = projects.filter((p) => p.status === "active").length;
+      if (activeCount >= limits.projects) {
+        throw new Error(`You've reached the limit of ${limits.projects} active project${limits.projects > 1 ? "s" : ""} on the ${plan} plan. Please upgrade to create more.`);
+      }
+      return;
+    }
+
+    case "create_moodboard": {
+      if (limits.moodboards === -1) return;
+      const moodboards = await ctx.db
+        .query("moodboards")
+        .withIndex("by_user_id", (q) => q.eq("userId", userId))
+        .collect();
+      if (moodboards.length >= limits.moodboards) {
+        throw new Error(`You've reached the limit of ${limits.moodboards} moodboards on the ${plan} plan. Please upgrade to create more.`);
+      }
+      return;
+    }
+
+    case "generate_ai_image": {
+      if (limits.aiGenerations === -1) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const aiUsage = await (ctx.db as any)
+        .query("aiUsage")
+        .withIndex("by_user_id", (q: { eq: (f: string, v: unknown) => unknown }) => q.eq("userId", userId))
+        .collect();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const generationsThisPeriod = aiUsage.filter((u: any) =>
+        u.type === "image_generation" && Number(u.createdAt || 0) >= periodStart
+      ).length;
+      if (generationsThisPeriod >= limits.aiGenerations) {
+        throw new Error(`You've used all ${limits.aiGenerations} AI image generations for this period on the ${plan} plan. Please upgrade for more.`);
+      }
+      return;
+    }
+
+    case "add_product": {
+      if (limits.productsPerMonth === -1) return;
+      const products = await ctx.db
+        .query("products")
+        .withIndex("by_user_id", (q) => q.eq("userId", userId))
+        .collect();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const productsThisPeriod = products.filter((p: any) =>
+        Number(p.createdAt || 0) >= periodStart
+      ).length;
+      if (productsThisPeriod >= limits.productsPerMonth) {
+        throw new Error(`You've added ${limits.productsPerMonth} products this period on the ${plan} plan. Please upgrade to add more.`);
+      }
+      return;
+    }
+  }
+}
 
 // Get current user's subscription
 export const getSubscription = query({

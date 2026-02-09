@@ -5,6 +5,7 @@ import {
   authorizeMoodboardAccess,
   authorizeProjectAccess,
 } from "./auth-helpers";
+import { enforceSubscriptionLimit } from "./subscriptions";
 
 // List moodboards for a project
 export const listByProject = query({
@@ -94,6 +95,9 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const { user } = await authorizeProjectAccess(ctx, args.projectId);
+
+    // Enforce subscription limits
+    await enforceSubscriptionLimit(ctx, user._id, "create_moodboard");
 
     const now = Date.now();
 

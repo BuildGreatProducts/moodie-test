@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getAuthenticatedUser } from "./auth-helpers";
+import { enforceSubscriptionLimit } from "./subscriptions";
 
 // Categories, room types, and styles for filtering
 export const PRODUCT_CATEGORIES = [
@@ -55,6 +56,9 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const user = await getAuthenticatedUser(ctx);
+
+    // Enforce subscription limits
+    await enforceSubscriptionLimit(ctx, user._id, "add_product");
 
     // Validate and trim name
     const trimmedName = args.name.trim();
