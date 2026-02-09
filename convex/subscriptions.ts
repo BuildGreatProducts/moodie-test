@@ -264,8 +264,8 @@ export const upsertSubscription = internalMutation({
       throw new Error(`User not found for email: ${args.userEmail}`);
     }
 
-    // Check if subscription exists
-    const existingSubscription = await ctx.db
+    // First, check if this exact Polar subscription already exists
+    const existingPolarSubscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_polar_subscription_id", (q) =>
         q.eq("polarSubscriptionId", args.polarSubscriptionId)
@@ -274,10 +274,10 @@ export const upsertSubscription = internalMutation({
 
     const now = Date.now();
 
-    if (existingSubscription) {
-      // Update existing subscription
+    if (existingPolarSubscription) {
+      // Update existing Polar subscription
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (ctx.db as any).patch(existingSubscription._id, {
+      await (ctx.db as any).patch(existingPolarSubscription._id, {
         plan: args.plan,
         status: args.status,
         currentPeriodStart: args.currentPeriodStart,
@@ -285,12 +285,19 @@ export const upsertSubscription = internalMutation({
         cancelAtPeriodEnd: args.cancelAtPeriodEnd,
         updatedAt: now,
       });
-      return existingSubscription._id;
-    } else {
-      // Create new subscription
+      return existingPolarSubscription._id;
+    }
+
+    // Check if user has any existing subscription (e.g., free plan created at signup)
+    const existingUserSubscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user_id", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (existingUserSubscription) {
+      // Upgrade existing subscription (e.g., from free to paid)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const subscriptionId = await (ctx.db as any).insert("subscriptions", {
-        userId: user._id,
+      await (ctx.db as any).patch(existingUserSubscription._id, {
         polarSubscriptionId: args.polarSubscriptionId,
         polarCustomerId: args.polarCustomerId,
         plan: args.plan,
@@ -298,11 +305,26 @@ export const upsertSubscription = internalMutation({
         currentPeriodStart: args.currentPeriodStart,
         currentPeriodEnd: args.currentPeriodEnd,
         cancelAtPeriodEnd: args.cancelAtPeriodEnd,
-        createdAt: now,
         updatedAt: now,
       });
-      return subscriptionId;
+      return existingUserSubscription._id;
     }
+
+    // Create new subscription (shouldn't normally happen, but handle edge case)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subscriptionId = await (ctx.db as any).insert("subscriptions", {
+      userId: user._id,
+      polarSubscriptionId: args.polarSubscriptionId,
+      polarCustomerId: args.polarCustomerId,
+      plan: args.plan,
+      status: args.status,
+      currentPeriodStart: args.currentPeriodStart,
+      currentPeriodEnd: args.currentPeriodEnd,
+      cancelAtPeriodEnd: args.cancelAtPeriodEnd,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return subscriptionId;
   },
 });
 
