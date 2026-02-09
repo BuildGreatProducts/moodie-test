@@ -251,8 +251,13 @@ http.route({
           const subscriptionId = subscription.id || subscription.subscription_id;
           const customerId =
             subscription.customer_id || subscription.customer?.id;
-          const plan =
-            subscription.product?.name || subscription.plan?.name || "pro";
+          const planName = subscription.product?.name || subscription.plan?.name;
+          if (!planName) {
+            console.warn(
+              `Webhook missing plan info for subscription ${subscription.id}, defaulting to free`
+            );
+          }
+          const plan = planName || "free";
           const status = subscription.status || "active";
           const periodStart = subscription.current_period_start
             ? new Date(subscription.current_period_start).getTime()
