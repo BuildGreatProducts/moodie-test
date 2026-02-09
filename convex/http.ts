@@ -135,6 +135,19 @@ async function verifyPolarSignature(
     return false;
   }
 
+  // Validate timestamp to prevent replay attacks (5 minute tolerance)
+  const TIMESTAMP_TOLERANCE_SECONDS = 5 * 60; // 5 minutes
+  const timestampSeconds = parseInt(webhookTimestamp, 10);
+  if (isNaN(timestampSeconds)) {
+    console.warn("Invalid webhook timestamp format");
+    return false;
+  }
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  if (Math.abs(nowSeconds - timestampSeconds) > TIMESTAMP_TOLERANCE_SECONDS) {
+    console.warn(`Webhook timestamp outside tolerance window: ${timestampSeconds} vs ${nowSeconds}`);
+    return false;
+  }
+
   try {
     // Build the signed payload as per Standard Webhooks spec
     const signedPayload = `${webhookId}.${webhookTimestamp}.${rawBody}`;
