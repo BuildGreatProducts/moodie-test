@@ -30,7 +30,8 @@ export const createConversation = mutation({
     moodboardId: v.id("moodboards"),
   },
   handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx);
+    // Verify user owns the moodboard before creating conversation
+    const { user } = await authorizeMoodboardAccess(ctx, args.moodboardId);
 
     // Check if conversation already exists using compound index
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,7 +67,8 @@ export const getOrCreateConversation = mutation({
     moodboardId: v.id("moodboards"),
   },
   handler: async (ctx, args) => {
-    const user = await getAuthenticatedUser(ctx);
+    // Verify user owns the moodboard before creating conversation
+    const { user } = await authorizeMoodboardAccess(ctx, args.moodboardId);
 
     // Use compound index to find user's conversation for this moodboard
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
