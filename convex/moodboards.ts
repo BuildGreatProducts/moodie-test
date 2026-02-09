@@ -1,0 +1,311 @@
+import { v } from "convex/values";
+import { mutation, query } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
+import {
+  authorizeMoodboardAccess,
+  authorizeProjectAccess,
+} from "./auth-helpers";
+import { enforceSubscriptionLimit } from "./subscriptions";
+
+// List moodboards for a project
+export const listByProject = query({
+  args: { projectId: v.id("projects") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!user) {
+      return [];
+    }
+
+    // Verify user owns the project
+    const project = await ctx.db.get(args.projectId);
+    if (!project || project.userId !== user._id) {
+      return [];
+    }
+
+    const moodboards = await ctx.db
+      .query("moodboards")
+      .withIndex("by_project_id", (q) => q.eq("projectId", args.projectId))
+      .order("desc")
+      .collect();
+
+    return moodboards;
+  },
+});
+
+// Get a single moodboard by ID
+export const get = query({
+  args: { id: v.id("moodboards") },
+  handler: async (ctx, args) => {
+    const { moodboard } = await authorizeMoodboardAccess(ctx, args.id);
+    return moodboard;
+  },
+});
+
+// Get moodboard by share ID (for public viewing)
+export const getByShareId = query({
+  args: { shareId: v.string() },
+  handler: async (ctx, args) => {
+    const moodboard = await ctx.db
+      .query("moodboards")
+      .withIndex("by_share_id", (q) => q.eq("shareId", args.shareId))
+      .first();
+
+    if (!moodboard) {
+      return null;
+    }
+
+    // Check if sharing is enabled
+    if (!moodboard.shareEnabled) {
+      return null;
+    }
+
+    // Check if share link has expired
+    const expiresAt = moodboard.shareExpiresAt as number | undefined;
+    if (expiresAt && expiresAt < Date.now()) {
+      return null;
+    }
+
+    // Return public-safe data (exclude sensitive fields)
+    return {
+      _id: moodboard._id,
+      name: moodboard.name,
+      description: moodboard.description,
+      canvasState: moodboard.canvasState,
+      thumbnailUrl: moodboard.thumbnailUrl,
+      hasPassword: !!moodboard.sharePasswordHash,
+    };
+  },
+});
+
+// Create a new moodboard
+export const create = mutation({
+  args: {
+    projectId: v.id("projects"),
+    name: v.string(),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { user } = await authorizeProjectAccess(ctx, args.projectId);
+
+    // Enforce subscription limits
+    await enforceSubscriptionLimit(ctx, user._id, "create_moodboard");
+
+    const now = Date.now();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const moodboardId = await (ctx.db as any).insert("moodboards", {
+      projectId: args.projectId,
+      userId: user._id,
+      name: args.name,
+      description: args.description,
+      canvasState: JSON.stringify({ nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }),
+      shareEnabled: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return moodboardId;
+  },
+});
+
+// Update moodboard metadata
+export const update = mutation({
+  args: {
+    id: v.id("moodboards"),
+    name: v.optional(v.string()),
+    description: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await authorizeMoodboardAccess(ctx, args.id);
+
+    const { id, ...updates } = args;
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (ctx.db as any).patch(id, {
+      ...filteredUpdates,
+      updatedAt: Date.now(),
+    });
+
+    return id;
+  },
+});
+
+// Update canvas state (for auto-save)
+export const updateCanvasState = mutation({
+  args: {
+    id: v.id("moodboards"),
+    canvasState: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await authorizeMoodboardAccess(ctx, args.id);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (ctx.db as any).patch(args.id, {
+      canvasState: args.canvasState,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
+
+// Update thumbnail
+export const updateThumbnail = mutation({
+  args: {
+    id: v.id("moodboards"),
+    thumbnailUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await authorizeMoodboardAccess(ctx, args.id);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (ctx.db as any).patch(args.id, {
+      thumbnailUrl: args.thumbnailUrl,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
+
+// Delete a moodboard
+export const remove = mutation({
+  args: { id: v.id("moodboards") },
+  handler: async (ctx, args) => {
+    await authorizeMoodboardAccess(ctx, args.id);
+
+    // Delete all comments for this moodboard
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_moodboard_id", (q) => q.eq("moodboardId", args.id))
+      .collect();
+
+    for (const comment of comments) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (ctx.db as any).delete(comment._id);
+    }
+
+    // Delete all files for this moodboard
+    const files = await ctx.db
+      .query("files")
+      .withIndex("by_moodboard_id", (q) => q.eq("moodboardId", args.id))
+      .collect();
+
+    for (const file of files) {
+      // Delete from storage if possible
+      if (file.storageId) {
+        try {
+          await ctx.storage.delete(file.storageId as Id<"_storage">);
+        } catch {
+          // Storage deletion may fail if file doesn't exist
+        }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (ctx.db as any).delete(file._id);
+    }
+
+    // Delete all AI conversations and their messages for this moodboard
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const aiConversations = await (ctx.db as any)
+      .query("aiConversations")
+      .withIndex("by_moodboard_id", (q: { eq: (f: string, v: unknown) => unknown }) => q.eq("moodboardId", args.id))
+      .collect();
+
+    for (const conversation of aiConversations) {
+      // Delete all messages in this conversation
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messages = await (ctx.db as any)
+        .query("aiMessages")
+        .withIndex("by_conversation_id", (q: { eq: (f: string, v: unknown) => unknown }) => q.eq("conversationId", conversation._id))
+        .collect();
+
+      for (const message of messages) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (ctx.db as any).delete(message._id);
+      }
+
+      // Delete the conversation
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (ctx.db as any).delete(conversation._id);
+    }
+
+    // Delete the moodboard
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (ctx.db as any).delete(args.id);
+
+    return args.id;
+  },
+});
+
+// Generate share link
+export const generateShareLink = mutation({
+  args: {
+    id: v.id("moodboards"),
+    expiresInDays: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await authorizeMoodboardAccess(ctx, args.id);
+
+    // Generate a deterministic share ID from moodboard ID + timestamp
+    // (Convex mutations must be deterministic for replay safety)
+    const timestamp = Date.now();
+    const input = `${args.id}-${timestamp}`;
+    // Simple hash to create a UUID-like string
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+      const char = input.charCodeAt(i);
+      hash = ((hash << 5) - hash + char) | 0;
+    }
+    const hashHex = Math.abs(hash).toString(16).padStart(8, "0");
+    const timestampHex = timestamp.toString(16);
+    const shareId = `${hashHex}-${timestampHex.slice(0, 4)}-${timestampHex.slice(4, 8)}-${timestampHex.slice(8)}`;
+
+    const updateData: {
+      shareId: string;
+      shareEnabled: boolean;
+      shareExpiresAt?: number;
+      updatedAt: number;
+    } = {
+      shareId,
+      shareEnabled: true,
+      updatedAt: Date.now(),
+    };
+
+    if (args.expiresInDays) {
+      updateData.shareExpiresAt = Date.now() + args.expiresInDays * 24 * 60 * 60 * 1000;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (ctx.db as any).patch(args.id, updateData);
+
+    return { shareId };
+  },
+});
+
+// Disable share link
+export const disableShareLink = mutation({
+  args: { id: v.id("moodboards") },
+  handler: async (ctx, args) => {
+    await authorizeMoodboardAccess(ctx, args.id);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (ctx.db as any).patch(args.id, {
+      shareEnabled: false,
+      updatedAt: Date.now(),
+    });
+
+    return args.id;
+  },
+});
